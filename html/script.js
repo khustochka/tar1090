@@ -1219,6 +1219,9 @@ function initPage() {
             return;
         }
     }
+
+    if (pTracks) $(".pTracksLink").hide();
+    else $(".noTracksLink").hide();
 }
 
 function initLegend(colors) {
