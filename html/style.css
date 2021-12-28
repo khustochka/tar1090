@@ -4,8 +4,8 @@
     --BGCOLOR2: #CCCCCC;
     --ACCENT: #00596b;
     --FS1: calc( 10px * var(--SCALE));
-    --FS2: calc( 13px * var(--SCALE));
-    --FS3: calc( 17px * var(--SCALE));
+    --FS2: calc( 14px * var(--SCALE));
+    --FS3: calc( 18px * var(--SCALE));
     --TXTCOLOR1: #003f4b;
     --TXTCOLOR2: #050505;
     --TXTCOLOR3: #101010;
@@ -289,7 +289,7 @@ div#loader { z-index: 99; position: absolute; left: 0; top: 0; bottom: 0; right:
 
 .hidden { display: none; }
 
-.infoblock_heading a  { text-decoration: none; color: blue; font-size: x-small;}
+/*.infoblock_heading a  { text-decoration: none; color: blue; font-size: x-small;}*/
 
 .dim    { opacity: 0.3; filter:alpha(opacity=30); /* For IE8 and earlier */ }
 
