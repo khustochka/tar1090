@@ -11,7 +11,8 @@ fi
 
 
 srcdir=/run/dump1090-fa
-repo="https://github.com/wiedehopf/tar1090"
+repo="https://github.com/khustochka/tar1090"
+branch="ui"
 db_repo="https://github.com/wiedehopf/tar1090-db"
 ipath=/usr/local/share/tar1090
 lighttpd=no
@@ -120,7 +121,7 @@ then
     cd /tmp/tar1090-test
     TAR_VERSION=$(date +%s)
 else
-    if ! getGIT "$repo" "master" "$ipath/git" || ! cd "$ipath/git" || ! git rev-parse
+    if ! getGIT "$repo" "$branch" "$ipath/git" || ! cd "$ipath/git" || ! git rev-parse
     then
         echo "Unable to download files, exiting! (Maybe try again?)"
         exit 1
@@ -161,7 +162,7 @@ if [[ -n $2 ]]; then
 elif [[ -n $1 ]] && [ "$1" != "test" ] ; then
     instances="$srcdir tar1090"
 elif [ -f /etc/default/tar1090_instances ]; then
-    instances=$(</etc/default/tar1090_instances)	
+    instances=$(</etc/default/tar1090_instances)
 else
     instances="$srcdir tar1090"
 fi
