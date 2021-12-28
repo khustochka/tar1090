@@ -264,11 +264,13 @@ let HideCols = [
 //	"#distance",
 	"#track",
 	"#msgs",
-	"#seen",
+//	"#seen",
 //	"#rssi",
 	"#lat",
 	"#lon",
 	"#data_source",
+	"#wd",
+	"#ws",
 	"#military",
 ]
 
