@@ -163,19 +163,12 @@ select {
 #splitter {
     cursor: ew-resize;
     display: block;
-    position: absolute;
-    top:  calc( 5px * var(--SCALE));
-    left: calc( 0px * var(--SCALE));
-    float: right;
-    width: calc( 30px * var(--SCALE));
-    height: calc( 30px * var(--SCALE));
-    background-size: calc( 30px * var(--SCALE)) calc( 30px * var(--SCALE));
-    background-repeat: no-repeat;
-    background-color: transparent;
-    border: none;
-    background-image: url("images/toggle-width.png");
-    background-size: cover;
-    transform: scaleX(-1);
+    width: 1px;
+    height: 100%;
+    left: 0 !important;
+    background-color: gray;
+    border-right: 1px solid white;
+    border-left: 1px solid white;
 }
 
 #splitter-infoblock {
