@@ -1281,7 +1281,7 @@ function iconTest() {
     jQuery('#header_top').hide();
     jQuery('#header_side').hide();
     jQuery('#splitter').hide();
-    jQuery('#tabs').hide();
+    jQuery('#tabsSection').hide();
     jQuery('#filterButton').hide();
     jQuery('.ol-control').hide();
     jQuery('.ol-attribution').show();

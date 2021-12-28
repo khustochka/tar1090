@@ -879,3 +879,9 @@ input{
 #replaySpeedHint{
   grid-area: speedHint;
 }
+#searchAccordion h5, #searchAccordion h5.ui-state-hover {
+  border: 0;
+  background-color: transparent;
+  color: var(--TXTCOLOR1);
+  text-decoration: underline;
+}

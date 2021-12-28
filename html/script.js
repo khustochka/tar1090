@@ -797,6 +797,12 @@ function initPage() {
         collapsible: true
     });
 
+    jQuery('#searchAccordion').accordion({
+        active: false,
+        collapsible: true,
+        heightStyle: "content",
+    });
+
     // Set page basics
     document.title = PageName;
 
@@ -1525,7 +1531,7 @@ function startPage() {
         jQuery('#header_top').hide();
         jQuery('#header_side').hide();
         jQuery('#splitter').hide();
-        jQuery('#tabs').hide();
+        jQuery('#tabsSection').hide();
         jQuery('#filterButton').hide();
         jQuery('.ol-control').hide();
         jQuery('.ol-attribution').show();
@@ -2303,7 +2309,7 @@ function initMap() {
                     jQuery('#header_top').hide();
                     jQuery('#header_side').hide();
                     jQuery('#splitter').hide();
-                    jQuery('#tabs').hide();
+                    jQuery('#tabsSection').hide();
                     jQuery('#filterButton').hide();
                     jQuery('.ol-control').hide();
                     jQuery('.ol-attribution').show();
@@ -2311,7 +2317,7 @@ function initMap() {
                     jQuery('#header_top').show();
                     jQuery('#header_side').show();
                     jQuery('#splitter').show();
-                    jQuery('#tabs').show();
+                    jQuery('#tabsSection').show();
                     jQuery('#filterButton').show();
                     jQuery('.ol-control').show();
                     jQuery('#expand_sidebar_control').hide();
@@ -4127,7 +4133,7 @@ function invertMap(evt){
   ctx.globalAlpha = alpha;  // alpha 0 = no effect 1 = full effect
   ctx.fillRect(0, 0, evt.ctx.canvas.width, ctx.canvas.height);
 
-  
+
 }
 //
 // Altitude Chart begin
