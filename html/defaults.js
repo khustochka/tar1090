@@ -13,12 +13,12 @@ let disabled = false;
 
 // -- Title Settings --------------------------------------
 // Show number of aircraft and/or messages per second in the page title
-let PlaneCountInTitle = false;
+let PlaneCountInTitle = true;
 let MessageRateInTitle = false;
 
 // -- Output Settings -------------------------------------
-// The DisplayUnits setting controls whether nautical (ft, NM, knots), 
-// metric (m, km, km/h) or imperial (ft, mi, mph) units are used in the 
+// The DisplayUnits setting controls whether nautical (ft, NM, knots),
+// metric (m, km, km/h) or imperial (ft, mi, mph) units are used in the
 // plane table and in the detailed plane info. Valid values are
 // "nautical", "metric", or "imperial".
 let DisplayUnits = "nautical";
@@ -59,7 +59,7 @@ let actual_range_outline_dash = null; // null - solid line, [5, 5] - dashed line
 let MapType_tar1090 = "osm_adsbx";
 
 // Default map dim state
-let MapDim = true;
+let MapDim = false;
 let mapDimPercentage = 0.45;
 let mapContrastPercentage = 0;
 
@@ -175,7 +175,7 @@ let ColorByAlt = {
 // Also called range rings :)
 let SiteCircles = true; // true to show circles (only shown if the center marker is shown)
 // In miles, nautical miles, or km (depending settings value 'DisplayUnits')
-let SiteCirclesDistances = new Array(100, 150, 200);
+let SiteCirclesDistances = new Array(50, 100, 150, 200);
 // When more circles defined than cirle colors last color will be used or black by default
 let SiteCirclesColors = ['#000000', '#000000', '#000000'];
 // Show circles using dashed line (CAUTION, can be slow, especially when zooming in a lot)
@@ -221,8 +221,8 @@ let uatNoTISB = false;
 // Don't display any TIS-B planes
 let filterTISB = false;
 
-let flightawareLinks = false;
-let shareBaseUrl = false;
+let flightawareLinks = true;
+let shareBaseUrl = 'https://globe.adsbexchange.com/';
 
 // show links to various registration websites (not all countries)
 let registrationLinks = true;
@@ -312,7 +312,7 @@ let filterMaxRange = 1e8; // 100 000 km should include all planes on earth ;)
 
 let jaeroTimeout = 35 * 60; // in seconds
 
-let darkModeDefault = true; // turn on dark mode by default (change in browser possible)
+let darkModeDefault = false; // turn on dark mode by default (change in browser possible)
 
 // legacy variables
 let OutlineMlatColor = null;
