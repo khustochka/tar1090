@@ -364,6 +364,7 @@ PlaneObject.prototype.updateTrackPrev = function() {
     this.prev_true = this.true_head;
     this.prev_alt = this.altitude;
     this.prev_alt_rounded = this.alt_rounded;
+    this.prev_alt_geom = this.alt_geom;
     this.prev_speed = this.speed;
     this.prev_rId = this.rId;
 
@@ -403,9 +404,11 @@ PlaneObject.prototype.updateTrack = function(now, last, serverTrack, stale) {
         let newseg = { fixed: new ol.geom.LineString([projHere]),
             feature: null,
             estimated: false,
-            ground: on_ground,
+            ground: (this.altitude == "ground"),
             altitude: this.alt_rounded,
             alt_real: this.altitude,
+            alt_geom: this.alt_geom,
+            position: this.position,
             speed: this.speed,
             ts: now,
             track: this.rotation,
@@ -509,7 +512,7 @@ PlaneObject.prototype.updateTrack = function(now, last, serverTrack, stale) {
             stale_timeout = jaeroTimeout;
     }
     if (replay)
-        stale_timeout = replay.ival / 1000 + 5;
+        stale_timeout = 2 * replay.ival + 1;
 
     // Also check if the position was already stale when it was exported by dump1090
     // Makes stale check more accurate for example for 30s spaced history points
@@ -589,10 +592,12 @@ PlaneObject.prototype.updateTrack = function(now, last, serverTrack, stale) {
         this.track_linesegs.push({ fixed: new ol.geom.LineString(points),
             feature: null,
             estimated: estimated,
+            ground: (this.prev_alt == "ground"),
             altitude: this.prev_alt_rounded,
             alt_real: this.prev_alt,
+            alt_geom: this.prev_alt_geom,
+            position: this.prev_position,
             speed: this.prev_speed,
-            ground: on_ground,
             ts: this.prev_time,
             track: this.prev_rot,
             leg: is_leg,
@@ -812,15 +817,21 @@ PlaneObject.prototype.updateIcon = function() {
     ) {
         let callsign = "";
         if (this.flight && this.flight.trim())
-            callsign =  NBSP + this.flight.trim() + NBSP;
+            callsign =  this.flight.trim();
         else if (this.registration)
-            callsign =  NBSP + 'reg: ' + this.registration + NBSP;
+            callsign =  'reg: ' + this.registration;
         else
-            callsign =  NBSP + 'hex: ' + this.icao + NBSP;
+            callsign =   'hex: ' + this.icao;
         const unknown = NBSP+NBSP+"?"+NBSP+NBSP;
 
-        let altString = (this.altitude == null) ? unknown : format_altitude_brief(this.altitude, this.vert_rate, DisplayUnits, showLabelUnits);
-        let speedString = (this.speed == null) ? (NBSP+'?'+NBSP) : format_speed_brief(this.speed, DisplayUnits, showLabelUnits).padStart(4, NBSP);
+        let alt;
+        if (labelsGeom) {
+            alt = adjust_geom_alt(this.alt_geom, this.position);
+        } else {
+            alt = this.altitude;
+        }
+        let altString = (alt == null) ? unknown : format_altitude_brief(alt, this.vert_rate, DisplayUnits, showLabelUnits);
+        let speedString = (this.speed == null) ? (NBSP+'?'+NBSP) : format_speed_brief(this.speed, DisplayUnits, showLabelUnits).padStart(3, NBSP);
 
         labelText = "";
         if (extendedLabels == 3) {
@@ -913,10 +924,11 @@ PlaneObject.prototype.updateIcon = function() {
                     backgroundFill: bgFill,
                     stroke: labelStrokeNarrow,
                     textAlign: 'left',
-                    textBaseline: "top",
+                    textBaseline: 'top',
                     font: labelFont,
                     offsetX: (this.shape.w *0.5*0.74*this.scale),
                     offsetY: (this.shape.w *0.5*0.74*this.scale),
+                    padding: [1, 0, -1, 2],
                 }),
                 zIndex: this.zIndex,
             };
@@ -1179,10 +1191,12 @@ PlaneObject.prototype.processTrace = function() {
             this.track_linesegs.push({ fixed: new ol.geom.LineString([proj]),
                 feature: null,
                 estimated: false,
+                ground: (this.altitude == "ground"),
                 altitude: this.alt_rounded,
                 alt_real: this.altitude,
+                alt_geom: this.alt_geom,
+                position: this.position,
                 speed: this.speed,
-                ground: (this.altitude == "ground"),
                 ts: this.position_time,
                 track: this.rotation,
                 rId: this.rId,
@@ -1207,9 +1221,11 @@ PlaneObject.prototype.processTrace = function() {
 
     let mapSize = OLMap.getSize();
     let size = [Math.max(5, mapSize[0] - 280), mapSize[1]];
-    if (!traceOpts.showTime && (showTrace || showTraceExit)
+    if (!traceOpts.showTime
+        && (showTrace || showTraceExit)
         && !multiSelect
         && this.position
+        && !(traceOpts.noFollow && traceOpts.noFollow + 3 > new Date().getTime() / 1000)
         && !inView(this.position, myExtent(OLMap.getView().calculateExtent(size)))
         && !inView(firstPos, myExtent(OLMap.getView().calculateExtent(size))))
     {
@@ -1449,6 +1465,9 @@ PlaneObject.prototype.updateData = function(now, last, data, init) {
 
     // simple fields
     this.alt_geom = data.alt_geom;
+    if (debugTracks && this.selected) {
+        console.log('updateData() updating alt_geom: ' + this.alt_geom);
+    }
     this.ias = data.ias;
     this.tas = data.tas;
     this.track_rate = data.track_rate;
@@ -1811,43 +1830,72 @@ PlaneObject.prototype.updateLines = function() {
             trackLabels ||
             ((i == 0 || i == this.track_linesegs.length-1 ||seg.leg) && showTrace && enableLabels)
         ) {
-            const alt_real = (seg.alt_real != null) ? seg.alt_real : 'n/a';
-            const speed = (seg.speed != null) ? seg.speed.toFixed(0).toString() : 'n/a';
+            // 0 vertical rate to avoid arrow
+            let altString;
+            if(seg.alt_real == "ground") {
+                altString = "Ground";
+            } else {
+                let alt;
+                if (labelsGeom) {
+                    alt = adjust_geom_alt(seg.alt_geom, seg.position);
+                } else {
+                    alt = seg.alt_real;
+                }
+
+                if (alt == null) {
+                    altString = (NBSP+'?'+NBSP);
+                } else {
+                    altString = format_altitude_brief(alt, 0, DisplayUnits, showLabelUnits);
+                }
+            }
+            const speedString = (seg.speed == null) ? (NBSP+'?'+NBSP) : format_speed_brief(seg.speed, DisplayUnits, showLabelUnits).padStart(3, NBSP);
+
             seg.label = new ol.Feature(new ol.geom.Point(seg.fixed.getFirstCoordinate()));
-            let timestamp;
+            let timestamp1;
+            let timestamp2 = "";
+            const historic = (showTrace || replay);
+            const useLocal = ((historic && !utcTimesHistoric) || (!historic && !utcTimesLive));
             const date = new Date(seg.ts * 1000);
             const refDate = (showTrace || replay) ? traceDate : new Date();
             if (getDay(refDate) == getDay(date)) {
-                timestamp = "";
+                timestamp1 = "";
             } else {
-                if (utcTimes) {
-                    timestamp = zDateString(date);
+                if (useLocal) {
+                    timestamp1 = lDateString(date);
                 } else {
-                    timestamp = lDateString(date);
+                    timestamp1 = zDateString(date);
                 }
-                timestamp += '\n';
+                timestamp1 += '\n';
             }
-            if (utcTimes) {
-                timestamp += zuluTime(date);
+
+            if (useLocal) {
+                timestamp2 += localTime(date);
             } else {
-                timestamp += localTime(date);
+                timestamp2 += zuluTime(date);
             }
+
             if (traces_high_res) {
-                let zz = timestamp.slice(-2);
-                timestamp = timestamp.slice(0, -2) + '.' + (Math.floor((seg.ts*10)) % 10) + zz;
+                timestamp2 += '.' + (Math.floor((seg.ts*10)) % 10);
             }
+
+            if (showTrace && !utcTimesHistoric) {
+                timestamp2 += '\n' + TIMEZONE;
+            } else if (!useLocal) {
+                timestamp2 += NBSP + 'Z';
+            }
+
             let text =
-                speed.padStart(3, NBSP) + "  "
-                + (alt_real == "ground" ? ("Ground") : (alt_real.toString().padStart(6, NBSP)))
+                speedString.padStart(3, NBSP) + "  "
+                + altString.padStart(6, NBSP)
                 + "\n"
                 //+ NBSP + format_track_arrow(seg.track)
-                + timestamp;
+                + timestamp1 + timestamp2;
             if (seg.rId && show_rId) {
                 text += "\n" + seg.rId.substring(0,9); //+ "\n" + seg.rId.substring(9,18);
             }
 
             if (showTrace && !trackLabels)
-                text = timestamp;
+                text = timestamp1 + timestamp2;
 
             let fill = labelFill;
             let zIndex = -i - 50 * (seg.alt_real == null);
@@ -2246,11 +2294,21 @@ PlaneObject.prototype.updateTraceData = function(state, _now) {
     const alt_geom = state[6] & 8;
     const rate = state[7];
     const data = state[8];
+    const type = state[9];
+    const geom_alt = state[10];
+    const geom_rate = state[11];
+    const ias = state[12];
+    const roll = state[13];
+    const rId = state[14];
 
     this.position = [lon, lat];
     this.position_time = _now;
     this.last_message_time = Math.max(_now, this.last_message_time);
     this.altitude = altitude;
+
+    if (altitude && altitude != "ground" && this.geom_diff_ts && _now - this.geom_diff_ts < 60) {
+        this.alt_geom = altitude + this.geom_diff;
+    }
 
     this.updateAlt();
 
@@ -2286,8 +2344,22 @@ PlaneObject.prototype.updateTraceData = function(state, _now) {
         this.geom_rate = null;
     }
 
-    if (state[9])
-        this.rId = state[9];
+    if (geom_alt !== undefined) {
+        this.alt_geom = geom_alt;
+    }
+    if (geom_rate !== undefined) {
+        this.geom_rate = geom_rate;
+    }
+
+    if (roll !== undefined)
+        this.roll = roll;
+    if (ias !== undefined)
+        this.ias = ias;
+    if (type !== undefined)
+        this.addrtype = (type == null) ? null : `${type}`;
+
+    if (rId !== undefined)
+        this.rId = rId;
 
     if (data != null) {
         if (data.type.substring(0,4) == "adsb") {
@@ -2318,6 +2390,12 @@ PlaneObject.prototype.updateTraceData = function(state, _now) {
                 this.flight = `${data.flight}`;
                 this.name = this.flight.trim() || 'n/a';
             }
+        }
+
+        if (data.alt_geom != null && !alt_geom && altitude != null && altitude != "ground") {
+            //this.alt_geom = altitude + this.geom_diff;
+            this.geom_diff = data.alt_geom - altitude;
+            this.geom_diff_ts = _now;
         }
 
         this.addrtype = (data.type == null) ? null : `${data.type}`;
@@ -2446,10 +2524,12 @@ PlaneObject.prototype.cross180 = function(on_ground, is_leg) {
     this.track_linesegs.push({ fixed: new ol.geom.LineString([seg1.shift()]),
         feature: null,
         estimated: true,
+        ground: (this.prev_alt == "ground"),
         altitude: this.prev_alt_rounded,
         alt_real: this.prev_alt,
+        alt_geom: this.prev_alt_geom,
+        position: this.prev_position,
         speed: this.prev_speed,
-        ground: on_ground,
         ts: this.prev_time,
         track: this.prev_rot,
         leg: is_leg,
@@ -2459,10 +2539,12 @@ PlaneObject.prototype.cross180 = function(on_ground, is_leg) {
     this.track_linesegs.push({ fixed: new ol.geom.LineString(seg1),
         feature: null,
         estimated: true,
+        ground: (this.prev_alt == "ground"),
         altitude: this.prev_alt_rounded,
         alt_real: this.prev_alt,
+        alt_geom: this.prev_alt_geom,
+        position: this.prev_position,
         speed: this.prev_speed,
-        ground: on_ground,
         track: this.prev_rot,
         ts: NaN,
         noLabel: true,
@@ -2472,10 +2554,12 @@ PlaneObject.prototype.cross180 = function(on_ground, is_leg) {
     this.track_linesegs.push({ fixed: new ol.geom.LineString(seg2),
         feature: null,
         estimated: true,
+        ground: (this.prev_alt == "ground"),
         altitude: this.prev_alt_rounded,
         alt_real: this.prev_alt,
+        alt_geom: this.prev_alt_geom,
+        position: this.prev_position,
         speed: this.prev_speed,
-        ground: on_ground,
         track: this.prev_rot,
         ts: NaN,
         noLabel: true,

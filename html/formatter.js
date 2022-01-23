@@ -134,7 +134,7 @@ function format_onground (alt) {
 // alt in feet
 function convert_altitude(alt, displayUnits) {
 	if (displayUnits === "metric") {
-		return alt / 3.2808;  // feet to meters
+		return alt * 0.3048;  // feet to meters
 	}
 
 	return alt;
@@ -571,9 +571,9 @@ function wqi(data) {
         } else if (type4 == 'tisb') {
             ac.version = ac.tisb_version;
         }
-        if (stride == 116) {
+        if (stride == 112) {
             let part2 = u32[27].toString(16).padStart(8, '0');
-            ac.rId = u32[28].toString(16).padStart(8, '0') + '-' + part2.slice(0, 4) + '-' + part2.slice(4);
+            ac.rId = part2.slice(0, 4) + '-' + part2.slice(4);
         }
 
         data.aircraft.push(ac);
