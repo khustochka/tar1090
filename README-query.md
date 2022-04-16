@@ -12,10 +12,10 @@
 
 - icao=icao - selects and isolates the selected plane(s). Separate multiple with commas.
 - noIsolation - show other planes and not only the ones selected by ?icao
-- icaoFilter=hex1,hex2,hex3 - Only show the mentioned hex ids, no other aircraft will ever be displayed
+- icaoFilter=hex1,hex2,hex3 - Only show the mentioned hex IDs, no other aircraft will ever be displayed
 - reg=registration - Direct link to specific aircraft registration(s). Separate multiple with commas. ?icao is preferred as this option takes longer to load.
-- filterAltMin=500 - filter minimum altitute to 500ft
-- filterAltMax=5000 - filter maximum altitute to 5000ft
+- filterAltMin=500 - filter minimum altitute to 500 ft
+- filterAltMax=5000 - filter maximum altitute to 5000 ft
 - filterCallSign=^(UAL|DAL) - filter callsign to United or Deleta
 - filterType=B738 - filter to aircraft type B738 aka 737-800
 - filterDescription=L2J - filter aircraft by description
@@ -54,11 +54,13 @@
 - hideButtons - hides all buttons.
 - centerReceiver - conter the view on receiver position.
 - nowebgl - force rendering without WebGL.
+- tableInView - button V / only show aircraft in view in the table
 
 ## Toggles
 
 - mil - Military/Interesting.
-- tempTrails - enable temporary aircraft trails.
+- tempTrails - enable temporary aircraft trails / tracks.
 - mobile - Force mobile view.
 - desktop - force desktop view.
 - kiosk - force kiosk mode (tempTrails=true / hideButtons=true / userScale=2).
+- allTracks - enable tracks as if pressing T

@@ -10,7 +10,7 @@
 //MessageRateInTitle = false;
 
 // -- Output Settings -------------------------------------
-// The DisplayUnits setting controls whether nautical (ft, NM, knots),
+// The DisplayUnits setting controls whether nautical (ft, nmi, kt),
 // metric (m, km, km/h) or imperial (ft, mi, mph) units are used in the
 // plane table and in the detailed plane info. Valid values are
 // "nautical", "metric", or "imperial".
@@ -70,6 +70,13 @@
 // only with bing key:
 // bing_aerial
 // bing_roads
+
+
+// default these overlays to on for visitors which haven't disabled them in the browser in a previous session
+// defaultOverlays = ['radolan', 'nexrad'];
+
+// change which product from DWD to use
+// dwdLayers = 'dwd:RX-Produkt';
 
 // Default map dim state, true or false.
 // MapDim = true;
@@ -209,6 +216,7 @@ BingMapsAPIKey = null;
 
 //flightawareLinks = false;
 //shareBaseUrl = 'https://globe.adsbexchange.com/';
+// planespottersLinks = false;
 
 // show links to various registration websites (not all countries)
 // registrationLinks = true;
@@ -299,6 +307,8 @@ HideCols = [
 //
 //
 //darkModeDefault = true; // turn on dark mode by default (change in browser possible)
+
+//tableInView = false; // only show aircraft in current view (V button)
 
 /*
 tableColors = {

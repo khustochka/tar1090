@@ -45,12 +45,22 @@ function createBaseLayers() {
     }));
     */
 
+    if (offlineMapDetail > 0) {
+        world.push(new ol.layer.Tile({
+            source: new ol.source.OSM({
+                "url" : "osm_tiles_offline/{z}/{x}/{y}.png",
+                attributionsCollapsible: false,
+                maxZoom: offlineMapDetail,
+            }),
+            name: 'osm_tiles_offline',
+            title: 'OpenStreetMap offline',
+            type: 'base',
+        }));
+    }
 
     world.push(new ol.layer.Tile({
         source: new ol.source.OSM({
             "url" : "https://map.adsbexchange.com/mapproxy/tiles/1.0.0/osm/osm_grid/{z}/{x}/{y}.png",
-             //'hosted by <a href="https://adsbexchange.com/">adsbexchange.com</a> '
-            "attributions" : '© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>  contributors.',
             attributionsCollapsible: false,
             maxZoom: 16,
         }),
@@ -62,11 +72,25 @@ function createBaseLayers() {
     world.push(new ol.layer.Tile({
         source: new ol.source.OSM({
             maxZoom: 17,
+            attributionsCollapsible: false,
         }),
         name: 'osm',
         title: 'OpenStreetMap',
         type: 'base',
     }));
+
+    if (!adsbexchange) {
+        world.push(new ol.layer.Tile({
+            source: new ol.source.OSM({
+                "url" : "https://{a-d}.tile.openstreetmap.de/{z}/{x}/{y}.png",
+                attributionsCollapsible: false,
+                maxZoom: 17,
+            }),
+            name: 'osm_de',
+            title: 'OpenStreetMap DE',
+            type: 'base',
+        }));
+    }
 
     world.push(new ol.layer.Tile({
         source: new ol.source.XYZ({
@@ -201,18 +225,22 @@ function createBaseLayers() {
 
         let chartbundleTypes = {
             sec: "Sectional Charts",
-            enrh: "IFR Enroute High Charts"
+            enrh: "IFR Enroute High Charts",
+
+            tac: "Terminal Area Charts",
+            hel: "Helicopter Charts",
+            enrl: "IFR Enroute Low Charts",
+            enra: "IFR Area Charts",
         };
 
         for (let type in chartbundleTypes) {
             us.push(new ol.layer.Tile({
-                source: new ol.source.TileWMS({
-                    url: 'https://map.adsbexchange.com/mapproxy/wms',
-                    params: {LAYERS: type},
+                source: new ol.source.OSM({
+                    url: 'https://map.adsbexchange.com/mapproxy/tiles/1.0.0/'+ type + '/osm_grid/{z}/{x}/{y}.png',
                     projection: 'EPSG:3857',
                     attributions: 'Tiles courtesy of <a href="http://www.chartbundle.com/">ChartBundle</a>',
                     attributionsCollapsible: false,
-                    maxZoom: 12, // doesn't work for WMS
+                    maxZoom: 11,
                 }),
                 name: 'chartbundle_' + type,
                 title: chartbundleTypes[type],
@@ -220,10 +248,6 @@ function createBaseLayers() {
                 group: 'chartbundle'}));
         }
         chartbundleTypes = {
-            tac: "Terminal Area Charts",
-            hel: "Helicopter Charts",
-            enrl: "IFR Enroute Low Charts",
-            enra: "IFR Area Charts",
             secgrids: "Sect. w/ SAR grid",
         };
 
@@ -336,7 +360,7 @@ function createBaseLayers() {
         let dwd = new ol.layer.Tile({
             source: new ol.source.TileWMS({
                 url: 'https://maps.dwd.de/geoserver/wms',
-                params: {LAYERS: 'dwd:RX-Produkt', validtime: (new Date()).getTime()},
+                params: {LAYERS: dwdLayers, validtime: (new Date()).getTime()},
                 projection: 'EPSG:3857',
                 attributions: 'Deutscher Wetterdienst (DWD)',
                 attributionsCollapsible: false,
@@ -410,6 +434,15 @@ function createBaseLayers() {
     us.push(createGeoJsonLayer('US A2A Refueling', 'usa2arefueling', 'geojson/US_A2A_refueling.geojson', 'rgba(52, 50, 168, 0.3)', 'rgba(52, 50, 168, 1)'));
 
     us.push(createGeoJsonLayer('US ARTCC Boundaries', 'usartccboundaries', 'geojson/US_ARTCC_boundaries.geojson', 'rgba(255, 0, 255, 0.3)', 'rgba(255, 0, 255, 1)', false));
+
+    if (uk_advisory) {
+        europe.push(createGeoJsonLayer('uka_airports', 'uka_airports', 'geojson/uk_advisory/airports.geojson', 'rgba(255, 255, 255, 1)', 'rgba(255, 255, 255, 1)'));
+        europe.push(createGeoJsonLayer('uka_airspaces', 'uka_airspaces', 'geojson/uk_advisory/airspaces.geojson', 'rgba(0, 0, 0, 0.1)', 'rgba(0, 30, 255, 0.2)'));
+        //europe.push(createGeoJsonLayer('hotspots', 'hotspots', 'geojson/uk_advisory/hotspots.geojson', 'rgba(255, 255, 255, 1)', 'rgba(255, 255, 255, 1)'));
+        //europe.push(createGeoJsonLayer('navaids', 'navaids', 'geojson/uk_advisory/navaids.geojson', 'rgba(0, 0, 0, 1)', 'rgba(0, 0, 0, 1)'));
+        europe.push(createGeoJsonLayer('uka_runways', 'uka_runways', 'geojson/uk_advisory/runways.geojson', 'rgba(0, 0, 0, 0.5)', 'rgba(0, 0, 0, 0.5)'));
+        europe.push(createGeoJsonLayer('uka_shoreham', 'uka_shoreham', 'geojson/uk_advisory/shoreham.geojson', 'rgba(0, 0, 0, 0.5)', 'rgba(0, 0, 0, 0.5)'));
+    }
 
     if (l3harris) {
         let files = ['IFT_NAV_Routes.geojson','IFT_Training_Areas.geojson','USAFA_Training_Areas.geojson'];

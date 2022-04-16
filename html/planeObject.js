@@ -49,7 +49,7 @@ function PlaneObject(icao) {
 
 PlaneObject.prototype.setNull = function() {
     this.flight = null;
-    this.name = 'n/a';
+    this.name = 'no callsign';
     this.squawk    = null;
     this.category  = null;
     this.dataSource = "modeS";
@@ -454,7 +454,7 @@ PlaneObject.prototype.updateTrack = function(now, last, serverTrack, stale) {
         this.bad_position = this.position;
         this.too_fast++;
         if (debugPosFilter) {
-            console.log(this.icao + " / " + this.name + " ("+ this.dataSource + "): Implausible position filtered: " + this.bad_position[0] + ", " + this.bad_position[1] + " (kts/Mach " + (derivedMach*666).toFixed(0) + " > " + (filterSpeed*666).toFixed(0)   + " / " + derivedMach.toFixed(2) + " > " + filterSpeed.toFixed(2) + ") (" + (this.position_time - this.prev_time + 0.2).toFixed(1) + "s)");
+            console.log(this.icao + " / " + this.name + " ("+ this.dataSource + "): Implausible position filtered: " + this.bad_position[0] + ", " + this.bad_position[1] + " (kt/Mach " + (derivedMach*666).toFixed(0) + " > " + (filterSpeed*666).toFixed(0)   + " / " + derivedMach.toFixed(2) + " > " + filterSpeed.toFixed(2) + ") (" + (this.position_time - this.prev_time + 0.2).toFixed(1) + "s)");
         }
         this.position = this.prev_position;
         this.position_time = this.prev_time;
@@ -563,7 +563,7 @@ PlaneObject.prototype.updateTrack = function(now, last, serverTrack, stale) {
         // The new state is only drawn after the state has changed
         // and we then get a new position.
 
-        this.logSel("sec_elapsed: " + since_update.toFixed(1) + " alt_change: "+ alt_change.toFixed(0) + " derived_speed(kts/Mach): " + (distance_traveled/since_update*1.94384).toFixed(0) + " / " + (distance_traveled/since_update/343).toFixed(1) + " dist:" + distance_traveled.toFixed(0));
+        this.logSel("sec_elapsed: " + since_update.toFixed(1) + " alt_change: "+ alt_change.toFixed(0) + " derived_speed(kt/Mach): " + (distance_traveled/since_update*1.94384).toFixed(0) + " / " + (distance_traveled/since_update/343).toFixed(1) + " dist:" + distance_traveled.toFixed(0));
 
         let points = [projPrev];
 
@@ -626,7 +626,7 @@ PlaneObject.prototype.updateTrack = function(now, last, serverTrack, stale) {
         lastseg.fixed.appendCoordinate(projPrev);
         this.history_size ++;
 
-        this.logSel("sec_elapsed: " + since_update.toFixed(1) + " " + (on_ground ? "ground" : "air") +  " dist:" + distance_traveled.toFixed(0) +  " track_change: "+ track_change.toFixed(1) + " derived_speed(kts/Mach): " + (distance_traveled/since_update*1.94384).toFixed(0) + " / " + (distance_traveled/since_update/343).toFixed(1));
+        this.logSel("sec_elapsed: " + since_update.toFixed(1) + " " + (on_ground ? "ground" : "air") +  " dist:" + distance_traveled.toFixed(0) +  " track_change: "+ track_change.toFixed(1) + " derived_speed(kt/Mach): " + (distance_traveled/since_update*1.94384).toFixed(0) + " / " + (distance_traveled/since_update/343).toFixed(1));
 
         return this.updateTail();
     }
@@ -822,6 +822,7 @@ PlaneObject.prototype.updateIcon = function() {
             callsign =  'reg: ' + this.registration;
         else
             callsign =   'hex: ' + this.icao;
+
         const unknown = NBSP+NBSP+"?"+NBSP+NBSP;
 
         let alt;
@@ -834,7 +835,11 @@ PlaneObject.prototype.updateIcon = function() {
         let speedString = (this.speed == null) ? (NBSP+'?'+NBSP) : format_speed_brief(this.speed, DisplayUnits, showLabelUnits).padStart(3, NBSP);
 
         labelText = "";
-        if (extendedLabels == 3) {
+        if (uk_advisory) {
+            labelText += callsign + '\n';
+            labelText += altString + '\n';
+            labelText += 'x' + this.squawk;
+        } else if (extendedLabels == 3) {
             if (!windLabelsSlim) {
                 labelText += 'Wind' + NBSP;
             }
@@ -869,7 +874,7 @@ PlaneObject.prototype.updateIcon = function() {
                 labelText += speedString + NBSP + NNBSP + altString.padStart(6, NBSP) + '\n';
             }
         }
-        if (extendedLabels < 3) {
+        if (extendedLabels < 3 && !uk_advisory) {
             labelText += callsign;
         }
     }
@@ -924,10 +929,10 @@ PlaneObject.prototype.updateIcon = function() {
                     backgroundFill: bgFill,
                     stroke: labelStrokeNarrow,
                     textAlign: 'left',
-                    textBaseline: 'top',
+                    textBaseline: labels_top ? 'bottom' : 'top',
                     font: labelFont,
                     offsetX: (this.shape.w *0.5*0.74*this.scale),
-                    offsetY: (this.shape.w *0.5*0.74*this.scale),
+                    offsetY: labels_top ? (this.shape.w *-0.3*0.74*this.scale) : (this.shape.w *0.5*0.74*this.scale),
                     padding: [1, 0, -1, 2],
                 }),
                 zIndex: this.zIndex,
@@ -1123,8 +1128,12 @@ PlaneObject.prototype.processTrace = function() {
             if (firstPos == null)
                 firstPos = this.position;
 
-            if (leg_marker)
+            if (leg_marker) {
                 this.leg_ts = _now;
+                if (debugTracks) {
+                    console.log('leg zulu: ' + zuluTime(new Date(this.leg_ts * 1000)) + ' epoch: ' + this.leg_ts);
+                }
+            }
             if (legStart != null && legStart > 0 && legStart == i)
                 this.leg_ts = _now;
             if (legEnd != null && legEnd < trace.length && legEnd == i + 1)
@@ -1387,15 +1396,13 @@ PlaneObject.prototype.updateData = function(now, last, data, init) {
     } else {
         this.request_rotation_from_track = true;
     }
-    // don't expire callsigns
-    if (flight != null) {
-        if (flight == "@@@@@@@@") {
-            this.flight = null;
-            this.name ='n/a';
-        } else {
-            this.flight = `${flight}`;
-            this.name = this.flight.trim() || 'n/a';
-        }
+
+    if (flight == null || flight == "@@@@@@@@") {
+        this.flight = null;
+        this.name ='no callsign';
+    } else {
+        this.flight = `${flight}`;
+        this.name = this.flight.trim() || 'empty callsign';
     }
 
     if (mlat && noMLAT) {
@@ -1534,7 +1541,9 @@ PlaneObject.prototype.updateData = function(now, last, data, init) {
     }
 
     this.request_rotation_from_track = false;
-    if (this.altitude == "ground") {
+    if (replay) {
+        this.request_rotation_from_track = true;
+    } else if (this.altitude == "ground") {
         if (this.true_heading != null)
             this.rotation = this.true_heading;
         else if (this.mag_heading != null)
@@ -2382,14 +2391,12 @@ PlaneObject.prototype.updateTraceData = function(state, _now) {
             this.dataSource = "unknown";
         }
 
-        if (data.flight != null) {
-            if (data.flight == "@@@@@@@@") {
-                this.flight = null;
-                this.name ='n/a';
-            } else {
-                this.flight = `${data.flight}`;
-                this.name = this.flight.trim() || 'n/a';
-            }
+        if (data.flight == null || data.flight == "@@@@@@@@") {
+            this.flight = null;
+            this.name ='no callsign';
+        } else {
+            this.flight = `${data.flight}`;
+            this.name = this.flight.trim() || 'empty callsign';
         }
 
         if (data.alt_geom != null && !alt_geom && altitude != null && altitude != "ground") {

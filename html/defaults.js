@@ -17,8 +17,8 @@ let PlaneCountInTitle = true;
 let MessageRateInTitle = false;
 
 // -- Output Settings -------------------------------------
-// The DisplayUnits setting controls whether nautical (ft, NM, knots),
-// metric (m, km, km/h) or imperial (ft, mi, mph) units are used in the
+// The DisplayUnits setting controls whether nautical (ft, nmi, kt),
+// metric (m, km, km/h) or imperial (ft, mi, mph) units are used in the 
 // plane table and in the detailed plane info. Valid values are
 // "nautical", "metric", or "imperial".
 let DisplayUnits = "nautical";
@@ -57,11 +57,15 @@ let actual_range_outline_dash = null; // null - solid line, [5, 5] - dashed line
 
 // which map is displayed to new visitors
 let MapType_tar1090 = "osm_adsbx";
+let defaultOverlays = [];
+let dwdLayers = 'dwd:RX-Produkt';
 
 // Default map dim state
 let MapDim = false;
 let mapDimPercentage = 0.45;
 let mapContrastPercentage = 0;
+
+let offlineMapDetail = -1;
 
 // -- Marker settings -------------------------------------
 
@@ -229,6 +233,7 @@ let filterTISB = false;
 
 let flightawareLinks = true;
 let shareBaseUrl = 'https://globe.adsbexchange.com/';
+let planespottersLinks = false;
 
 // show links to various registration websites (not all countries)
 let registrationLinks = true;
@@ -322,6 +327,8 @@ let filterMaxRange = 1e8; // 100 000 km should include all planes on earth ;)
 let jaeroTimeout = 35 * 60; // in seconds
 
 let darkModeDefault = false; // turn on dark mode by default (change in browser possible)
+
+let tableInView = false; // only show aircraft in current view (V button)
 
 // legacy variables
 let OutlineMlatColor = null;

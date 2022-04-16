@@ -180,6 +180,7 @@ function resetSettings() {
 if (usp.has('reset')) {
     resetSettings();
 }
+
 const feed = usp.get('feed');
 if (feed != null) {
     console.log('feed: ' + feed);
@@ -202,6 +203,11 @@ if (feed != null) {
 }
 if (usp.has('tfrs')) {
     tfrs = true;
+}
+
+let uk_advisory = false;
+if (usp.has('uk_advisory')) {
+    uk_advisory = true;
 }
 
 const customTiles = usp.get('customTiles');

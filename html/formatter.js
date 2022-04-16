@@ -4,6 +4,7 @@
 let NBSP='\u00a0';
 let NNBSP='\u202f';
 let DEGREES='\u00b0'
+let ENDASH='\u2013';
 let UP_TRIANGLE='\u25b2'; // U+25B2 BLACK UP-POINTING TRIANGLE
 let DOWN_TRIANGLE='\u25bc'; // U+25BC BLACK DOWN-POINTING TRIANGLE
 let EM_QUAD = '\u2001';
@@ -12,14 +13,42 @@ let TrackDirections = ["North","NE","East","SE","South","SW","West","NW"];
 let TrackDirectionArrows = ["\u21e7","\u2b00","\u21e8","\u2b02","\u21e9","\u2b03","\u21e6","\u2b01"];
 
 let UnitLabels = {
-	'altitude': { metric: "m", imperial: "ft", nautical: "ft"},
-	'speed': { metric: "km/h", imperial: "mph", nautical: "kt" },
-	'distance': { metric: "km", imperial: "mi", nautical: "NM" },
-	'verticalRate': { metric: "m/s", imperial: "ft/min", nautical: "ft/min" },
-	'distanceShort': {metric: "m", imperial: "ft", nautical: "m"}
+    'altitude': { metric: "m", imperial: "ft", nautical: "ft"},
+    'speed': { metric: "km/h", imperial: "mph", nautical: "kt" },
+    'distance': { metric: "km", imperial: "mi", nautical: "nmi" },
+    'verticalRate': { metric: "m/s", imperial: "ft/min", nautical: "ft/min" },
+    'distanceShort': { metric: "m", imperial: "ft", nautical: "m" }
+};
+
+let aircraftCategories = {
+    'A0': 'Unspecified powered aircraft',
+    'A1': `Light (< 15${NNBSP}500${NBSP}lb)`,
+    'A2': `Small (15${NNBSP}500 to 75${NNBSP}000${NBSP}lb)`,
+    'A3': `Large (75${NNBSP}000 to 300${NNBSP}000${NBSP}lb)`,
+    'A4': 'High Vortex Large(aircraft such as B-757)',
+    'A5': `Heavy (> 300${NNBSP}000${NBSP}lb)`,
+    'A6': `High Performance (> 5${NBSP}g acceleration and > 400${NBSP}kt)`,
+    'A7': 'Rotorcraft',
+    'B0': 'Unspecified unpowered aircraft or UAV or spacecraft',
+    'B1': 'Glider/sailplane',
+    'B6': 'Unmanned Aerial Vehicle',
+    'B7': 'Space/Trans-atmospheric vehicle',
+    'C0': 'Unspecified ground installation or vehicle',
+    'C1': `Surface Vehicle ${ENDASH} Emergency Vehicle`,
+    'C2': `Surface Vehicle ${ENDASH} Service Vehicle`,
+    'C3': 'Fixed Ground or Tethered Obstruction'
 };
 
 // formatting helpers
+
+function get_category_label(category) {
+    if (!category)
+        return '';
+    let label = aircraftCategories[category];
+    if (!label)
+        return '';
+    return label;
+}
 
 function get_unit_label(quantity, systemOfMeasurement) {
 	let labels = UnitLabels[quantity];
@@ -212,7 +241,7 @@ function format_distance_short (dist, displayUnits) {
 // dist in meters
 function convert_distance(dist, displayUnits) {
 	if (displayUnits === "metric") {
-		return (dist / 1000); // meters to kilometers
+		return (dist / 1000); // meters to kilometres
 	}
 	else if (displayUnits === "imperial") {
 		return (dist / 1609); // meters to miles
@@ -221,7 +250,7 @@ function convert_distance(dist, displayUnits) {
 }
 
 // dist in meters
-// converts meters to feet or just returns meters
+// converts meters to feet or just returns metres
 function convert_distance_short(dist, displayUnits) {
 	if (displayUnits === "imperial") {
 		return (dist / 0.3048); // meters to feet
@@ -382,6 +411,23 @@ function wqi(data) {
     data.east =  limits[3];
 
     data.messages = vals[7];
+
+    let s32 = new Int32Array(data.buffer, 0, stride / 4);
+    let receiver_lat = s32[8] / 1e6;
+    let receiver_lon = s32[9] / 1e6;
+
+    if (receiver_lat != 0 && receiver_lon != 0) {
+        //console.log("receiver_lat: " + receiver_lat + " receiver_lon: " + receiver_lon);
+        let position = {
+            coords: {
+                latitude: receiver_lat,
+                longitude: receiver_lon,
+            },
+        };
+        if (receiver_lat != SiteLat || receiver_lon != SiteLon) {
+            onLocationChange(position);
+        }
+    }
 
     data.aircraft = [];
     for (let off = stride; off < buffer.byteLength; off += stride) {
@@ -572,8 +618,8 @@ function wqi(data) {
             ac.version = ac.tisb_version;
         }
         if (stride == 112) {
-            let part2 = u32[27].toString(16).padStart(8, '0');
-            ac.rId = part2.slice(0, 4) + '-' + part2.slice(4);
+            ac.rId = u32[27].toString(16).padStart(8, '0');
+            //ac.rId = ac.rId.slice(0, 4) + '-' + ac.rId.slice(4);
         }
 
         data.aircraft.push(ac);
