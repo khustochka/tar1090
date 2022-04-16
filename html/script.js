@@ -116,6 +116,7 @@ let autoselect = false;
 let nogpsOnly = false;
 let trace_hist_only = false;
 let traces_high_res = false;
+let show_rId = true;
 
 let infoBlockWidth = baseInfoBlockWidth;
 
@@ -947,18 +948,99 @@ function initPage() {
             }
         }
     });
+    new Toggle({
+        key: "labelsGeom",
+        display: "Labels: geom. alt. (WGS84)",
+        container: "#settingsLeft",
+        init: labelsGeom,
+        setState: function(state) {
+            labelsGeom = state;
+            if (loadFinished) {
+                remakeTrails();
+                refreshSelected();
+            }
+        }
+    });
+    new Toggle({
+        key: "geomUseEGM",
+        display: "Geom. alt.: WGS84 -> EGM conversion (long load)",
+        container: "#settingsLeft",
+        init: geomUseEGM,
+        setState: function(state) {
+            geomUseEGM = state;
+            if (geomUseEGM) {
+                let egm = loadEGM();
+                if (egm) {
+                    egm.addEventListener('load', function() {
+                        remakeTrails();
+                        refreshSelected();
+                    });
+                    return;
+                }
+            }
+            if (loadFinished) {
+                remakeTrails();
+                refreshSelected();
+            }
+        }
+    });
 
     new Toggle({
-        key: "utcTimes",
-        display: "UTC times",
+        key: "utcTimesLive",
+        display: "Live track labels: UTC",
         container: "#settingsLeft",
-        init: utcTimes,
+        init: utcTimesLive,
         setState: function(state) {
-            utcTimes = state;
+            utcTimesLive = state;
             remakeTrails();
             refreshSelected();
         }
     });
+
+    new Toggle({
+        key: "utcTimesHistoric",
+        display: "Historic track labels: UTC",
+        container: "#settingsLeft",
+        init: utcTimesHistoric,
+        setState: function(state) {
+            utcTimesHistoric = state;
+            remakeTrails();
+            refreshSelected();
+        }
+    });
+
+    new Toggle({
+        key: "windLabelsSlim",
+        display: "Smaller wind labels",
+        container: "#settingsLeft",
+        init: windLabelsSlim,
+        setState: function(state) {
+            windLabelsSlim = state;
+            if (!loadFinished)
+                return;
+            for (let key in PlanesOrdered) {
+                PlanesOrdered[key].updateMarker();
+            }
+        }
+    });
+
+    new Toggle({
+        key: "showLabelUnits",
+        display: "Label units",
+        container: "#settingsLeft",
+        init: showLabelUnits,
+        setState: function(state) {
+            showLabelUnits = state;
+            if (!loadFinished)
+                return;
+            for (let key in PlanesOrdered) {
+                PlanesOrdered[key].updateMarker();
+            }
+            remakeTrails();
+            refreshSelected();
+        }
+    });
+
 
     jQuery('#tStop').on('click', function() { traceOpts.replaySpeed = 0; gotoTime(traceOpts.showTime); });
     jQuery('#t1x').on('click', function() { replaySpeedChange(1); });
@@ -970,7 +1052,7 @@ function initPage() {
     new Toggle({
         key: "shareFilters",
         display: "Include Filters In URLs",
-        container: "#settingsLeft",
+        container: "#settingsRight",
         init: false,
         setState: function(state) {
             updateAddressBar();
@@ -980,7 +1062,7 @@ function initPage() {
     new Toggle({
         key: "debugTracks",
         display: "Debug Tracks",
-        container: "#settingsLeft",
+        container: "#settingsRight",
         init: false,
         setState: function(state) {
             debugTracks = state;
@@ -991,7 +1073,7 @@ function initPage() {
     new Toggle({
         key: "debugAll",
         display: "Debug show all",
-        container: "#settingsLeft",
+        container: "#settingsRight",
         init: false,
         setState: function(state) {
             if (state)
@@ -1213,6 +1295,10 @@ function initPage() {
     if (adsbexchange) {
         jQuery('#adsbexchange_header').show();
         jQuery('#credits').show();
+        if (!onMobile) {
+            jQuery('#creditsSelected').show();
+            jQuery('#watermark_center').show();
+        }
         jQuery('#selected_infoblock').addClass('adsbx-selected-bg');
         if (false && window.self != window.top) {
             window.top.location.href = "https://www.adsbexchange.com/";
@@ -1652,7 +1738,7 @@ function webglAddLayer() {
         let glStyle = {
             symbol: {
                 symbolType: 'image',
-                src: 'images/sprites010.png',
+                src: 'images/sprites011.png',
                 size: [ 'get', 'size' ],
                 offset: [0, 0],
                 textureCoord: [ 'array',
@@ -2190,37 +2276,6 @@ function initMap() {
         }
     });
 
-    new Toggle({
-        key: "windLabelsSlim",
-        display: "Smaller wind labels",
-        container: "#settingsLeft",
-        init: windLabelsSlim,
-        setState: function(state) {
-            windLabelsSlim = state;
-            if (!loadFinished)
-                return;
-            for (let key in PlanesOrdered) {
-                PlanesOrdered[key].updateMarker();
-            }
-        }
-    });
-
-    new Toggle({
-        key: "showLabelUnits",
-        display: "Label units",
-        container: "#settingsLeft",
-        init: showLabelUnits,
-        setState: function(state) {
-            showLabelUnits = state;
-            if (!loadFinished)
-                return;
-            for (let key in PlanesOrdered) {
-                PlanesOrdered[key].updateMarker();
-            }
-        }
-    });
-
-
     window.addEventListener('keydown', function(e) {
         active();
         if (e.defaultPrevented ) {
@@ -2648,7 +2703,7 @@ function refreshSelected() {
     if (showTrace) {
         if (selected.position_time) {
             const date = new Date(selected.position_time * 1000);
-            let timestamp = utcTimes ? zuluTime(date) : localTime(date);
+            let timestamp = utcTimesHistoric ? (zuluTime(date) + NBSP + 'Z') : (lDateString(date) + ' ' + localTime(date) + NBSP + TIMEZONE);
             jQuery('#trace_time').updateText('Time:\n' + timestamp);
         } else {
             jQuery('#trace_time').updateText('Time:\n');
@@ -2726,7 +2781,7 @@ function refreshSelected() {
     else
         jQuery('#selected_ownop').updateText("");
 
-    if (selected.rId) {
+    if (selected.rId && show_rId) {
         jQuery('#receiver_id').updateText(selected.rId);
         jQuery('#receiver_id_div').removeClass('hidden');
     } else {
@@ -3989,6 +4044,9 @@ function onDisplayUnitsChanged(e) {
     jQuery(".distanceUnit").text(get_unit_label("distance", DisplayUnits));
     jQuery(".verticalRateUnit").text(get_unit_label("verticalRate", DisplayUnits));
     TAR.planeMan.redraw();
+
+    remakeTrails();
+    refreshSelected();
 }
 
 function onFilterByAltitude(e) {
@@ -4988,6 +5046,7 @@ function processURLParams(){
             const lon = parseFloat(usp.get("lon"));
             OLMap.getView().setCenter(ol.proj.fromLonLat([lon, lat]));
             follow = false;
+            traceOpts.noFollow = new Date().getTime() / 1000;
         }
         catch (error) {
             console.log("Error parsing lat/lon:", error);
@@ -6648,12 +6707,12 @@ function replayOnSliderMove() {
     date.setUTCMinutes(Number(replay.minutes));
     replay.seconds = 0;
     date.setUTCSeconds(Number(replay.seconds));
-    if (true || utcTimes) {
+    if (true || utcTimesHistoric) {
         jQuery("#replayDateHint").html("Date: " + zDateString(date));
-        jQuery("#replayTimeHint").html("Time: " + zuluTime(date));
+        jQuery("#replayTimeHint").html("Time: " + zuluTime(date) + NBSP + 'Z');
     } else {
         jQuery("#replayDateHint").html("Date: " + lDateString(date));
-        jQuery("#replayTimeHint").html("Time: " + localTime(date));
+        jQuery("#replayTimeHint").html("Time: " + localTime(date) + NBSP + TIMEZONE);
     }
 }
 let replayJumpEnabled = true;
@@ -6685,12 +6744,12 @@ function replaySetTimeHint(arg) {
     replayJumpEnabled = false;
     let dateString;
     let timeString;
-    if (true || utcTimes) {
+    if (true || utcTimesHistoric) {
         dateString = zDateString(replay.ts);
-        timeString = zuluTime(replay.ts);
+        timeString = zuluTime(replay.ts) + NBSP + 'Z';
     } else {
         dateString = lDateString(replay.ts);
-        timeString = localTime(replay.ts);
+        timeString = localTime(replay.ts) + NBSP + TIMEZONE;
     }
     jQuery("#replayDateHint").html("Date: " + dateString);
     jQuery("#replayTimeHint").html("Time: " + timeString);
@@ -7225,24 +7284,38 @@ function baseExportFilenameForAircrafts(aircrafts) {
 
 // Returns an array of {pos, alt, ts} for an aircraft.
 function coordsForExport(plane) {
-    var coords = [];
-    var numSegs = plane.track_linesegs.length;
+    let coords = [];
+    let numSegs = plane.track_linesegs.length;
     for (let i = 0; i < numSegs; i++) {
-        const proj = plane.track_linesegs[i].fixed.getCoordinates()[1];
-        if (proj) {
-            const pos = ol.proj.toLonLat(proj);
-            const alt = plane.track_linesegs[i].alt_real;
+        const pos = plane.track_linesegs[i].position;
+        if (pos) {
+            let alt = null;
+            if (plane.track_linesegs[i].alt_geom != null) {
+                alt = plane.track_linesegs[i].alt_geom;
+                alt = Math.round(alt * 0.3048); // convert ft to m
+            } else if (plane.track_linesegs[i].alt_real != null) {
+                alt = plane.track_linesegs[i].alt_real;
+                // Attempt to correct altitude. This could be better?
+                //
+                // 950 feet is the correction factor for an altimeter of 30.15.
+                // 25 feet is the quantum of transponder reporting. 0 altitude
+                // could be reported as -25, so just add 25.
+                alt = (alt + 950 + 25) * 0.3048;
+            }
+            if (plane.track_linesegs[i].ground) {
+                alt = "ground";
+            } else if (alt != null && egmLoaded) {
+                // alt is in meters at this point
+                alt = Math.round(egm96.ellipsoidToEgm96(pos[1], pos[0], alt));
+            }
+
             const ts = new Date(plane.track_linesegs[i].ts * 1000.0);
-            if (!alt) {
+            if (alt == null) {
                 console.log(`Skipping, no altitude: ${i} ${pos} ${ts}`);
                 continue;
             }
-            // Attempt to correct altitude. This could be better?
-            //
-            // 950 feet is the correction factor for an altimeter of 30.15.
-            // 25 feet is the quantum of transponder reporting. 0 altitude
-            // could be reported as -25, so just add 25.
-            coords.push({ pos, alt: (alt + 950 + 25) * 0.3048, ts });
+            //console.log(`exporting coord: ${i} ${pos} ${alt} ${ts}`);
+            coords.push({ pos: pos, alt: alt, ts: ts});
         } else {
             console.log(`Skipping ${i}`);
         }
@@ -7292,42 +7365,117 @@ function selectedPlanes() {
 }
 
 // Exports currently selected aircraft as KML.
+
+let egmScript = null;
+let egmLoaded = false;
+function loadEGM() {
+    if (egmScript) {
+        return null;
+    }
+    egmScript = document.createElement('script');
+    egmScript.src = "libs/egm96-universal-1.1.0.min.js";
+    egmScript.addEventListener('load', function() {
+        egmLoaded = true;
+    });
+    document.body.appendChild(egmScript);
+    return egmScript;
+}
+function adjust_geom_alt(alt, pos) {
+    if (geomUseEGM && egmLoaded) {
+        return egm96.ellipsoidToEgm96(pos[1], pos[0], alt * 0.3048) / 0.3048;
+    } else {
+        return alt;
+    }
+}
 function exportKML() {
+    if (!egmLoaded) {
+        let egm = loadEGM()
+        if (egm) {
+            egm.addEventListener('load', function() {
+                exportKML();
+            });
+        }
+        return;
+    }
+
     const planes = selectedPlanes();
     const folders = [];
-    for (let i = 0; i < planes.length; i++) {
-        const plane = planes[i];
-        const coords = coordsForExport(plane);
-        const whenObjs = coords.map((c) => {
-            const date = `${c.ts.getUTCFullYear()}-${zeroPad(c.ts.getUTCMonth() + 1, 2)}-${zeroPad(c.ts.getUTCDate(), 2)}`;
-            const time = `T${zeroPad(c.ts.getUTCHours(), 2)}:${zeroPad(c.ts.getUTCMinutes(), 2)}:${zeroPad(c.ts.getUTCSeconds(), 2)}.${zeroPad(c.ts.getUTCMilliseconds(), 3)}Z`;
-            return ["when", {}, date + time];
-        });
-        const coordObjs = coords.map((c) => ["gx:coord", {}, `${c.pos[0]} ${c.pos[1]} ${c.alt}`]);
-        var folder = ["Folder", {},
-            ["name", {}, `${(plane.registration || plane.icao).toUpperCase()} track`],
-            ["Placemark", {},
-                ["name", {}, (plane.registration || plane.icao).toUpperCase()],
-                ["Style", {},
-                    ["LineStyle", {},
-                        ["color", {}, RGBColorToKMLColor(EXPORT_RGB_COLORS[i % EXPORT_RGB_COLORS.length])],
-                        ["width", {}, 4]
-                    ],
-                    ["IconStyle", {},
-                        ["Icon", {},
-                            ["href", {}, "http://maps.google.com/mapfiles/kml/shapes/airports.png"]
-                        ]
-                    ]
-                ],
-                ["gx:Track", {},
-                    ["altitudeMode", {}, "absolute"],
-                    ["extrude", {}, "1"],
-                    ["tessellate", {}, "1"],
-                    ...whenObjs,
-                    ...coordObjs
-                ]
-            ]
+    for (let planeIndex = 0; planeIndex < planes.length; planeIndex++) {
+        const plane = planes[planeIndex];
+        let folder = ["Folder", {},
+            ["name", {}, `${(plane.registration || plane.icao).toUpperCase()} track`]
         ];
+        const coords = coordsForExport(plane);
+        let sections = [];
+        let currentSection = null;
+        let lastGround = null;
+        let lastC = null;
+        for (let i in coords) {
+            const c = coords[i];
+            const ground = (c.alt == "ground");
+            if (ground !== lastGround) {
+                // when changing between airborne and ground, create new section
+                if (lastC && currentSection) {
+                    // double up last coordinate to work around strange google earth transparency
+                    currentSection.coords.push(lastC);
+                }
+                currentSection = { ground: ground, coords: [] };
+                sections.push(currentSection);
+            }
+            lastGround = ground;
+            if (ground) {
+                c.alt = 0; // set KML altitude to zero
+            }
+            currentSection.coords.push(c);
+            lastC = c;
+        }
+        if (lastC && currentSection) {
+            // double up last coordinate to work around strange google earth transparency
+            currentSection.coords.push(lastC);
+        }
+        for (let i in sections) {
+            console.log("section " + i);
+            const s = sections[i];
+            const coords = s.coords;
+            const ground = s.ground;
+            const whenObjs = coords.map((c) => {
+                const date = `${c.ts.getUTCFullYear()}-${zeroPad(c.ts.getUTCMonth() + 1, 2)}-${zeroPad(c.ts.getUTCDate(), 2)}`;
+                const time = `T${zeroPad(c.ts.getUTCHours(), 2)}:${zeroPad(c.ts.getUTCMinutes(), 2)}:${zeroPad(c.ts.getUTCSeconds(), 2)}.${zeroPad(c.ts.getUTCMilliseconds(), 3)}Z`;
+                return ["when", {}, date + time];
+            });
+            const coordObjs = coords.map((c) => {
+                return ["gx:coord", {}, `${c.pos[0]} ${c.pos[1]} ${c.alt}`];
+            });
+            // splice together the xml track with / without altitude mode
+            // clamptoground is google earth default while other programs error on having that option set specifically
+            // so let google earth default to clamp to ground for ground track
+            let xmlTrack = ["gx:Track", {}];
+            if (!ground) {
+                xmlTrack.push(["altitudeMode", {}, "absolute"]);
+            }
+            xmlTrack = xmlTrack.concat([
+                ["extrude", {}, ground ? "0" : "1"],
+                ...whenObjs,
+                ...coordObjs
+            ]);
+            folder.push(
+                ["Placemark", {},
+                    ["name", {}, (plane.registration || plane.icao).toUpperCase()],
+                    ["Style", {},
+                        ["LineStyle", {},
+                            ["color", {}, RGBColorToKMLColor(EXPORT_RGB_COLORS[planeIndex % EXPORT_RGB_COLORS.length])],
+                            ["width", {}, 4]
+                        ],
+                        ["IconStyle", {},
+                            ["Icon", {},
+                                ["href", {}, "http://maps.google.com/mapfiles/kml/shapes/airports.png"]
+                            ]
+                        ]
+                    ],
+                    xmlTrack
+                ]
+            );
+        }
         folders.push(folder);
     }
     const filename = baseExportFilenameForAircrafts(planes);

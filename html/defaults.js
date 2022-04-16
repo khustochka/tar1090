@@ -206,8 +206,14 @@ let pf_data = ["chunks/pf.json"]
 
 let mapOrientation = 0; // This determines what is up, normally north (0 degrees)
 
-// Use UTC for all timestamps etc.
-let utcTimes = false;
+// NO LONGER USED
+let utcTimes = null;
+
+// Use UTC for live labels
+let utcTimesLive = false;
+
+// Use UTC for historic labels
+let utcTimesHistoric = true;
 
 // Only display labels when zoomed in this far:
 let labelZoom = 0;
@@ -293,7 +299,8 @@ let showSil = false;
 // provide ZZZZ.png to be shown when the type is not known.
 // this feature is provided as is please don't expect tar1090's support for getting the pictures right.
 
-
+let labelsGeom = false; // labels: uses geometric altitude (WGS84 ellipsoid unless geomUseEGM is enabled
+let geomUseEGM = false; // use EGM96 for displaying geometric altitudes (extra load time!)
 
 let windLabelsSlim = false;
 let showLabelUnits = true;
