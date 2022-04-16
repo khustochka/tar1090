@@ -2832,7 +2832,7 @@ function refreshSelected() {
         selIcao = selected.icao;
         let hex_html = "<span style='font-family: monospace;' class=identSmall>Hex:" + NBSP + selected.icao.toUpperCase() + "</span>";
         if (globeIndex || shareBaseUrl) {
-            let icao_link = "<span  class=identSmall><a class='link identSmall' target=\"_blank\" href=\"" + shareLink + "\">Share</a></span>";
+            let icao_link = "<span  class=identSmall><a class='link identSmall' target=\"_blank\" href=\"" + shareLink + "\">ADSBX</a></span>";
             hex_html = hex_html + NBSP + NBSP + NBSP + icao_link;
         }
         jQuery('#selected_icao').html(hex_html);
