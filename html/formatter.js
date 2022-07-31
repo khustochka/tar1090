@@ -31,6 +31,9 @@ let aircraftCategories = {
     'A7': 'Rotorcraft',
     'B0': 'Unspecified unpowered aircraft or UAV or spacecraft',
     'B1': 'Glider/sailplane',
+    'B2': 'Lighter-than-Air',
+    'B3': 'Parachutist/Skydiver',
+    'B4': 'Ultralight/hang-glider/paraglider',
     'B6': 'Unmanned Aerial Vehicle',
     'B7': 'Space/Trans-atmospheric vehicle',
     'C0': 'Unspecified ground installation or vehicle',
@@ -398,8 +401,10 @@ function iOSVersion() {
 
 function wqi(data) {
     const buffer = data.buffer;
+    //console.log(buffer);
     let vals = new Uint32Array(data.buffer, 0, 8);
     data.now = vals[0] / 1000 + vals[1] * 4294967.296;
+    //console.log(data.now);
     let stride = vals[2];
     data.global_ac_count_withpos = vals[3];
     data.globeIndex = vals[4];
@@ -524,7 +529,7 @@ function wqi(data) {
 
         ac.extraFlags = u8[106];
         ac.nogps = ac.extraFlags & 1;
-        if (ac.nogps && nogpsOnly) {
+        if (ac.nogps && nogpsOnly && (u8[73] & 64) != 0xffffffff) {
             u8[73] |= 64;
             u8[73] |= 16;
         }

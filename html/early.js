@@ -1,6 +1,15 @@
 // This was functionality of script.js, moved it to here to start the downloading of track history earlier
 "use strict";
 
+
+// TAR1090 application object
+let TAR;
+TAR = (function (global, jQuery, TAR) {
+    return TAR;
+}(window, jQuery, TAR || {}));
+
+let g = {};
+
 let Dump1090Version = "unknown version";
 let RefreshInterval = 1000;
 let globeSimLoad = 6;
@@ -22,6 +31,8 @@ let globeIndexGrid = 0;
 let globeIndexSpecialTiles;
 let dynGlobeRate = false;
 let binCraft = false;
+let reApi = false;
+let zstd = true; // init hasn't failed
 let dbServer = false;
 let l3harris = false;
 let heatmap = false;
@@ -45,6 +56,9 @@ let calcOutlineData = null;
 
 let uuid = null;
 let uuidCache = [];
+
+let inhibitFetch = false;
+let zstdDecode = null;
 
 let usp;
 try {
@@ -128,9 +142,10 @@ var fakeLocalStorage = function() {
 };
 
 
-if (window.location.href.match(/adsbexchange.com/) && window.location.pathname == '/')
+if (window.location.href.match(/adsbexchange.com/) && window.location.pathname == '/') {
     adsbexchange = true;
-if (adsbexchange && window.self != window.top) {
+}
+if (window.self != window.top) {
     fakeLocalStorage();
 } else {
     try {
@@ -234,7 +249,7 @@ function arraybufferRequest() {
     return xhrOverride;
 }
 
-if (usp.has('heatmap')) {
+if (usp.has('heatmap') || usp.has('realHeat')) {
 
     heatmap = {};
 
@@ -337,33 +352,35 @@ function lDateString(date) {
 
 let get_receiver_defer;
 let test_chunk_defer;
+const hostname = window.location.hostname;
 if (uuid) {
     // don't need receiver / chunks json
-} else if (adsbexchange && window.location.hostname.startsWith('globe')) {
+} else if (0 || (adsbexchange && (hostname.startsWith('globe.') || hostname.startsWith('globe-')))) {
     console.log("Using adsbexchange fast-path load!");
-    let data = JSON.parse('{"refresh":1600,"history":1,"dbServer":true,"binCraft":true,"globeIndexGrid":3,"globeIndexSpecialTiles":[{"south":60,"east":0,"north":90,"west":-126},{"south":60,"east":150,"north":90,"west":0},{"south":51,"east":-126,"north":90,"west":150},{"south":9,"east":-126,"north":51,"west":150},{"south":51,"east":-69,"north":60,"west":-126},{"south":45,"east":-114,"north":51,"west":-120},{"south":45,"east":-102,"north":51,"west":-114},{"south":45,"east":-90,"north":51,"west":-102},{"south":45,"east":-75,"north":51,"west":-90},{"south":45,"east":-69,"north":51,"west":-75},{"south":42,"east":18,"north":48,"west":12},{"south":42,"east":24,"north":48,"west":18},{"south":48,"east":24,"north":54,"west":18},{"south":54,"east":24,"north":60,"west":12},{"south":54,"east":12,"north":60,"west":3},{"south":54,"east":3,"north":60,"west":-9},{"south":42,"east":0,"north":48,"west":-9},{"south":42,"east":51,"north":51,"west":24},{"south":51,"east":51,"north":60,"west":24},{"south":30,"east":90,"north":60,"west":51},{"south":30,"east":120,"north":60,"west":90},{"south":30,"east":129,"north":39,"west":120},{"south":30,"east":138,"north":39,"west":129},{"south":30,"east":150,"north":39,"west":138},{"south":39,"east":150,"north":60,"west":120},{"south":9,"east":111,"north":21,"west":90},{"south":21,"east":111,"north":30,"west":90},{"south":9,"east":129,"north":24,"west":111},{"south":24,"east":120,"north":30,"west":111},{"south":24,"east":129,"north":30,"west":120},{"south":9,"east":150,"north":30,"west":129},{"south":9,"east":69,"north":30,"west":51},{"south":9,"east":90,"north":30,"west":69},{"south":-90,"east":51,"north":9,"west":-30},{"south":-90,"east":111,"north":9,"west":51},{"south":-90,"east":160,"north":-18,"west":111},{"south":-18,"east":160,"north":9,"west":111},{"south":-90,"east":-90,"north":-42,"west":160},{"south":-42,"east":-90,"north":9,"west":160},{"south":-9,"east":-42,"north":9,"west":-90},{"south":-90,"east":-63,"north":-9,"west":-90},{"south":-21,"east":-42,"north":-9,"west":-63},{"south":-90,"east":-42,"north":-21,"west":-63},{"south":-90,"east":-30,"north":9,"west":-42},{"south":9,"east":-117,"north":33,"west":-126},{"south":9,"east":-102,"north":30,"west":-117},{"south":9,"east":-90,"north":27,"west":-102},{"south":24,"east":-84,"north":30,"west":-90},{"south":9,"east":-69,"north":18,"west":-90},{"south":18,"east":-69,"north":24,"west":-90},{"south":36,"east":18,"north":42,"west":6},{"south":36,"east":30,"north":42,"west":18},{"south":9,"east":6,"north":39,"west":-9},{"south":9,"east":30,"north":36,"west":6},{"south":9,"east":51,"north":42,"west":30},{"south":24,"east":-69,"north":39,"west":-75},{"south":9,"east":-33,"north":30,"west":-69},{"south":30,"east":-33,"north":60,"west":-69},{"south":9,"east":-9,"north":30,"west":-33},{"south":30,"east":-9,"north":60,"west":-33}],"version":"adsbexchange backend"}');
+    let data = {"zstd":true,"reapi":true,"refresh":1600,"history":1,"dbServer":true,"binCraft":true,"globeIndexGrid":3,"globeIndexSpecialTiles":[],"version":"adsbexchange backend"};
     get_receiver_defer = jQuery.Deferred().resolve(data);
     test_chunk_defer = jQuery.Deferred().reject();
 } else {
     // get configuration json files, will be used in initialize function
-    get_receiver_defer = jQuery.ajax({
+
+    {get_receiver_defer = jQuery.ajax({
         url: 'data/receiver.json',
         cache: false,
         dataType: 'json',
         timeout: 10000,
-    });
-    test_chunk_defer = jQuery.ajax({
+    });}
+    {test_chunk_defer = jQuery.ajax({
         url:'chunks/chunks.json',
         cache: false,
         dataType: 'json',
         timeout: 4000,
-    });
+    });}
 }
 
-jQuery.getJSON(databaseFolder + "/icao_aircraft_types2.js").done(function(typeLookupData) {
+{jQuery.getJSON(databaseFolder + "/icao_aircraft_types2.js").done(function(typeLookupData) {
     _aircraft_type_cache = typeLookupData;
-});
-jQuery.getJSON(databaseFolder + "/ranges.js").done(function(ranges) {
+});}
+{jQuery.getJSON(databaseFolder + "/ranges.js").done(function(ranges) {
     if (!ranges || !ranges.military) {
         console.error("couldn't load milRanges.");
         return;
@@ -376,7 +393,7 @@ jQuery.getJSON(databaseFolder + "/ranges.js").done(function(ranges) {
             continue;
         milRanges.push([a, b]);
     }
-});
+});}
 
 
 let heatmapLoadingState = {};
@@ -401,13 +418,13 @@ function loadHeatChunk() {
         num: heatmapLoadingState.index,
         xhr: arraybufferRequest,
     });
-    req.done(function (responseData) {
+    {req.done(function (responseData) {
         heatChunks[this.num] = responseData;
         loadHeatChunk();
-    });
-    req.fail(function(jqxhr, status, error) {
+    });}
+    {req.fail(function(jqxhr, status, error) {
         loadHeatChunk();
-    });
+    });}
     heatmapLoadingState.index++;
 }
 
@@ -428,6 +445,8 @@ if (!heatmap) {
     loadHeatChunk();
     loadHeatChunk();
 }
+
+init_zstddec();
 
 function historyQueued() {
     if (!globeIndex && !uuid) {
@@ -451,6 +470,7 @@ if (uuid != null) {
     RefreshInterval = 5000;
     configureReceiver.resolve();
     //console.time("Downloaded History");
+    zstd = false;
 } else {
     get_receiver_defer.fail(function(data){
 
@@ -470,11 +490,12 @@ if (uuid != null) {
         RefreshInterval = data.refresh;
         nHistoryItems = (data.history < 2) ? 0 : data.history;
         binCraft = data.binCraft ? true : false || data.aircraft_binCraft ? true : false;
+        zstd = zstd && data.zstd; // check if it already failed, leave it off then
+        reApi = data.reapi ? true : false;
         if (usp.has('noglobe') || usp.has('ptracks')) {
             data.globeIndexGrid = null; // disable globe on user request
-            binCraft = data.aircraft_binCraft ? true : false;
         }
-        dbServer = (data.dbServer && data.globeIndexGrid != null) ? true : false;
+        dbServer = (data.dbServer) ? true : false;
 
         if (heatmap || replay) {
             if (replay && data.globeIndexGrid != null)
@@ -609,7 +630,7 @@ function globeRateUpdate() {
         jQuery.ajax({url:'/globeRates.json', cache: false, dataType: 'json', }).done(function(data) {
             if (data.simload != null)
                 globeSimLoad = data.simload;
-            if (data.refresh != null)
+            if (data.refresh != null && globeIndex)
                 RefreshInterval = data.refresh;
         });
     }
@@ -641,8 +662,9 @@ Toggle.prototype.init = function() {
             + '</div>'));
     }
 
-    if (this.button)
-        jQuery(this.button).on('click', this.toggle.bind(this));
+    if (this.button) {
+        jQuery(this.button).on('click', () => {this.toggle()});
+    }
 
     if (loStore[this.key] == 'true')
         this.state = true;
@@ -773,4 +795,47 @@ Filter.prototype.init = function() {
     ));
     jQuery('#' + this.id).on('submit', this.update);
     jQuery('#' + this.id).on('reset', this.reset);
+}
+
+let custom_layers = new ol.Collection();
+function add_kml_overlay(url, name, opacity) {
+    custom_layers.push(new ol.layer.Vector({
+        source: new ol.source.Vector({
+            url: url,
+            format: new ol.format.KML(),
+        }),
+        name: name,
+        title: 'custom_' + name,
+        type: 'overlay',
+        opacity: opacity,
+        visible: true,
+        zIndex: 99,
+    }));
+}
+
+
+function webAssemblyFail(e) {
+    zstdDecode = null;
+    zstd = false;
+    binCraft = false;
+    if (adsbexchange && !uuid) {
+        inhibitFetch = true;
+        reApi = false;
+        jQuery("#generic_error_detail").text("Your browser is not supporting webassembly, this website does not work without webassembly.");
+        jQuery("#generic_error").css('display','block');
+    }
+    if (e) {
+        console.log(e);
+    }
+    console.error("Error loading zstddec, probable cause: webassembly not present or not working");
+}
+
+function init_zstddec() {
+    try {
+        zstddec.decoder = new zstddec.ZSTDDecoder();
+        zstddec.promise = zstddec.decoder.init();
+        zstdDecode = zstddec.decoder.decode;
+    } catch (e) {
+        webAssemblyFail(e);
+    }
 }

@@ -21,10 +21,9 @@ function createBaseLayers() {
     let world = new ol.Collection();
     let us = new ol.Collection();
     let europe = new ol.Collection();
-    let custom = new ol.Collection();
 
     if (loStore['customTiles'] != undefined) {
-        custom.push(new ol.layer.Tile({
+        custom_layers.push(new ol.layer.Tile({
             source: new ol.source.OSM({
                 "url" : loStore['customTiles'],
                 maxZoom: 15,
@@ -79,6 +78,20 @@ function createBaseLayers() {
         type: 'base',
     }));
 
+    let basemap_id = "rastertiles/voyager";
+    world.push(new ol.layer.Tile({
+        source: new ol.source.OSM({
+            "url" : "https://{a-d}.basemaps.cartocdn.com/"+ basemap_id + "/{z}/{x}/{y}.png",
+            "attributions" : 'Powered by <a href="https://carto.com">CARTO.com</a>'
+            + ' using data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.',
+            attributionsCollapsible: false,
+            maxZoom: 15,
+        }),
+        name: "carto_" + basemap_id,
+        title: 'CARTO.com English',
+        type: 'base',
+    }));
+
     if (!adsbexchange) {
         world.push(new ol.layer.Tile({
             source: new ol.source.OSM({
@@ -92,42 +105,107 @@ function createBaseLayers() {
         }));
     }
 
-    world.push(new ol.layer.Tile({
-        source: new ol.source.XYZ({
-            url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            attributions: 'Powered by <a href="https://www.esri.com">Esri.com</a>' +
-            '— Sources: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-            attributionsCollapsible: false,
-            maxZoom: 17,
-        }),
-        name: 'esri',
-        title: 'ESRI.com Sat.',
-        type: 'base',
-    }));
-    world.push(new ol.layer.Tile({
-        source: new ol.source.XYZ({
-            url: "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-            attributions: 'Powered by <a href="https://www.esri.com">Esri.com</a>' +
-            '— Sources: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-            attributionsCollapsible: false,
-            maxZoom: 16,
-        }),
-        name: 'esri_gray',
-        title: 'ESRI.com Gray',
-        type: 'base',
-    }));
-    world.push(new ol.layer.Tile({
-        source: new ol.source.XYZ({
-            url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-            attributions: 'Powered by <a href="https://www.esri.com">Esri.com</a>' +
-            '— Sources: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-            attributionsCollapsible: false,
-            maxZoom: 17,
-        }),
-        name: 'esri_streets',
-        title: 'ESRI.com Streets',
-        type: 'base',
-    }));
+    if (false && adsbexchange) {
+        jQuery('#premium_text').updateText('Premium active!');
+        world.push(new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: "https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=HyIQ6A88uTDdX4n4MNVY",
+                attributions: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+                attributionsCollapsible: false,
+                maxZoom: 19,
+            }),
+            name: 'maptiler_sat',
+            title: 'Satellite (Premium)',
+            type: 'base',
+        }));
+        world.push(new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: "https://api.maptiler.com/maps/hybrid/256/{z}/{x}/{y}.jpg?key=HyIQ6A88uTDdX4n4MNVY",
+                attributions: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+                attributionsCollapsible: false,
+                maxZoom: 19,
+            }),
+            name: 'maptiler_hybrid',
+            title: 'Hybrid Sat. (Premium)',
+            type: 'base',
+        }));
+        world.push(new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: "https://api.maptiler.com/maps/777ad15e-3e64-4edf-8e86-84ba16e50961/256/{z}/{x}/{y}.png?key=geutV4UHZB7QFdlzE3w4",
+                attributions: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+                attributionsCollapsible: false,
+                maxZoom: 19,
+            }),
+            name: 'maptiler_custom',
+            title: 'ADSBx Custom (Premium)',
+            type: 'base',
+        }));
+    }
+    if (0 && adsbexchange) {
+        world.push(new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: "https://api.maptiler.com/maps/256/{z}/{x}/{y}.png?key=HyIQ6A88uTDdX4n4MNVY",
+                attributions: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+                attributionsCollapsible: false,
+                maxZoom: 16,
+            }),
+            name: 'maptiler_english',
+            title: 'English MapTiler (testing)',
+            type: 'base',
+        }));
+    }
+
+    if (!adsbexchange) {
+        world.push(new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                attributions: 'Powered by <a href="https://www.esri.com">Esri.com</a>' +
+                '— Sources: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                attributionsCollapsible: false,
+                maxZoom: 17,
+            }),
+            name: 'esri',
+            title: 'ESRI.com Sat.',
+            type: 'base',
+        }));
+        world.push(new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+                attributions: 'Powered by <a href="https://www.esri.com">Esri.com</a>' +
+                '— Sources: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                attributionsCollapsible: false,
+                maxZoom: 16,
+            }),
+            name: 'esri_gray',
+            title: 'ESRI.com Gray',
+            type: 'base',
+        }));
+        world.push(new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+                attributions: 'Powered by <a href="https://www.esri.com">Esri.com</a>' +
+                '— Sources: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                attributionsCollapsible: false,
+                maxZoom: 17,
+            }),
+            name: 'esri_streets',
+            title: 'ESRI.com Streets',
+            type: 'base',
+        }));
+    }
+
+    // testing ...
+    if (0) {
+        let english_map = new ol.layer.VectorTile({
+            declutter: true,
+            type: 'base',
+            name: 'english_map',
+            title: 'English Map',
+        });
+        // ol-mapbox-style plugin packed in with ol ... (kinda ugly)
+        //ol.applyStyle(english_map, "https://tiles.adsb.co/api/maps/basic/style.json");
+        world.push(english_map);
+    }
 
     if (0) {
         let vtlayer = new ol.layer.VectorTile({
@@ -154,6 +232,18 @@ function createBaseLayers() {
         world.push(vtlayer);
     }
 
+    world.push(new ol.layer.Tile({
+        source: new ol.source.OSM({
+            url: 'https://gibs-{a-c}.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/EPSG3857_500m/{z}/{y}/{x}.jpeg',
+            attributions: '<a href="https://terra.nasa.gov/about/terra-instruments/modis">MODIS Terra</a> ' +
+            + 'Provided by NASA\'s Global Imagery Browse Services (GIBS), part of NASA\'s Earth Observing System Data and Information System (EOSDIS)',
+            maxZoom: 8,
+        }),
+        name: 'gibs_reliev',
+        title: 'GIBS Relief',
+        type: 'base',
+    }));
+
     const date = new Date(Date.now() - 86400 * 1000);
     const yesterday = date.getUTCFullYear() + '-' + (date.getUTCMonth() + 1).toString().padStart(2, '0') + '-' + date.getUTCDate().toString().padStart(2, '0');
     world.push(new ol.layer.Tile({
@@ -167,7 +257,7 @@ function createBaseLayers() {
             maxZoom: 9,
         }),
         name: 'gibs',
-        title: 'NASA GIBS ' + yesterday,
+        title: 'GIBS Clouds ' + yesterday,
         type: 'base',
     }));
     // carto.com basemaps, see the following URLs for details on them:
@@ -191,7 +281,7 @@ function createBaseLayers() {
                     maxZoom: 15,
                 }),
                 name: "carto_" + basemap_id,
-                title: 'CARTO.com ' +basemap_id,
+                title: 'CARTO.com ' + basemap_id,
                 type: 'base',
             }));
         }
@@ -318,12 +408,13 @@ function createBaseLayers() {
         let refreshNexrad = function() {
             // re-build the source to force a refresh of the nexrad tiles
             let now = new Date().getTime();
-            nexrad.setSource(new ol.source.XYZ({
+            let nexradSource = new ol.source.XYZ({
                 url : 'https://mesonet{1-3}.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png?_=' + now,
                 attributions: 'NEXRAD courtesy of <a href="https://mesonet.agron.iastate.edu/">IEM</a>',
                 attributionsCollapsible: false,
                 maxZoom: 8,
-            }));
+            });
+            nexrad.setSource(nexradSource);
         };
 
         refreshNexrad();
@@ -335,7 +426,8 @@ function createBaseLayers() {
             url: 'https://nowcoast.noaa.gov/arcgis/services/nowcoast/radar_meteo_imagery_nexrad_time/MapServer/WMSServer',
             params: {'LAYERS': '1'},
             projection: 'EPSG:3857',
-            maxZoom: 10,
+            resolutions: [156543.03392804097, 78271.51696402048, 39135.75848201024, 19567.87924100512, 9783.93962050256, 4891.96981025128, 2445.98490512564, 1222.99245256282],
+            ratio: 1,
         });
 
         let noaaRadar = new ol.layer.Image({
@@ -357,15 +449,24 @@ function createBaseLayers() {
         const bottomLeft = ol.proj.fromLonLat([1.9,46.2]);
         const topRight = ol.proj.fromLonLat([16.0,55.0]);
         const extent = [bottomLeft[0], bottomLeft[1], topRight[0], topRight[1]];
-        let dwd = new ol.layer.Tile({
-            source: new ol.source.TileWMS({
-                url: 'https://maps.dwd.de/geoserver/wms',
-                params: {LAYERS: dwdLayers, validtime: (new Date()).getTime()},
-                projection: 'EPSG:3857',
-                attributions: 'Deutscher Wetterdienst (DWD)',
-                attributionsCollapsible: false,
+
+        let dwdSource = new ol.source.TileWMS({
+            url: 'https://maps.dwd.de/geoserver/wms',
+            params: {LAYERS: dwdLayers, validtime: (new Date()).getTime()},
+            projection: 'EPSG:3857',
+            attributions: 'Deutscher Wetterdienst (DWD)',
+            attributionsCollapsible: false,
+            tileGrid: ol.tilegrid.createXYZ({
+                extent: ol.tilegrid.extentFromProjection('EPSG:3857'),
+                maxResolution: 156543.03392804097,
                 maxZoom: 8,
+                minZoom: 0,
+                tileSize: 256,
             }),
+        });
+
+        let dwd = new ol.layer.Tile({
+            source: dwdSource,
             name: 'radolan',
             title: 'DWD RADOLAN',
             type: 'overlay',
@@ -452,13 +553,11 @@ function createBaseLayers() {
         }
     }
 
-    if (custom.getLength() > 0) {
-        layers.push(new ol.layer.Group({
-            name: 'custom',
-            title: 'Custom',
-            layers: new ol.Collection(custom.getArray().reverse()),
-        }));
-    }
+    layers.push(new ol.layer.Group({
+        name: 'custom',
+        title: 'Custom',
+        layers: custom_layers,
+    }));
 
     if (europe.getLength() > 0) {
         layers.push(new ol.layer.Group({
