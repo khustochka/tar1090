@@ -8,7 +8,9 @@ function PlaneObject(icao) {
 
     // Info about the plane
     this.icao      = icao;
-    this.icaorange = findICAORange(icao);
+    const icaorange = findICAORange(icao);
+    this.country = icaorange.country;
+    this.flag_image = icaorange.flag_image;
 
     this.numHex = parseInt(icao.replace('~', '1'), 16);
     this.fakeHex = this.numHex > 16777215; // non-icao hex
@@ -50,6 +52,7 @@ function PlaneObject(icao) {
 
 PlaneObject.prototype.setNull = function() {
     this.flight = null;
+    this.flightTs = 0;
     this.name = 'no callsign';
     this.squawk    = null;
     this.category  = null;
@@ -136,6 +139,7 @@ PlaneObject.prototype.setNull = function() {
 
 function planeCloneState(target, source) {
     target.flight = source.flight;
+    target.flightTs = source.flightTs;
     target.name = source.name;
     target.squawk = source.squawk;
     target.category = source.category;
@@ -253,6 +257,17 @@ PlaneObject.prototype.isFiltered = function() {
         return true;
     }
 
+    for (const filter of filters_active) {
+        if (!this[filter.field] || !this[filter.field].toUpperCase().match(filter.PATTERN)) {
+            //this[filter.field] && console.log(this[filter.field].toUpperCase() + ' ' + filter.PATTERN);
+            return true;
+        }
+    }
+
+    if (g.icao_nt_only && this.addrtype != 'adsb_icao_nt') {
+        return true;
+    }
+
     if (onlySelected && !this.selected) {
         return true;
     }
@@ -265,14 +280,6 @@ PlaneObject.prototype.isFiltered = function() {
         return true;
     }
 
-    if (onlyDataSource && this.dataSource != onlyDataSource) {
-        return true;
-    }
-
-    if (filterTISB && this.dataSource == "tisb") {
-        return true;
-    }
-
     if (!filterTracks && altFiltered(this.altitude))
         return true;
 
@@ -280,36 +287,17 @@ PlaneObject.prototype.isFiltered = function() {
         return true;
     }
 
-    let flags = PlaneFilter.flagFilter;
+    const flags = PlaneFilter.flagFilter;
     if (flags && flags.length > 0) {
         let found = false;
-        for (let i in flags) {
-            if (this[flags[i]]) {
+        for (const flag of flags) {
+            if (this[flag]) {
                 found = true;
             }
         }
         if (!found) {
             return true;
         }
-    }
-
-    if (PlaneFilter.icao && !this.icao.match(PlaneFilter.icao) ) {
-        return true;
-    }
-
-    if (PlaneFilter.type && !( (this.icaoType || 'UNKNOWN').match(PlaneFilter.type) )) {
-        return true;
-    }
-
-    if (PlaneFilter.description && !( (this.typeDescription || 'UNKNOWN' ).match(PlaneFilter.description) )) {
-        return true;
-    }
-
-    if (PlaneFilter.callsign
-        && (!this.flight || !this.flight.match(PlaneFilter.callsign))
-        && (!this.squawk || !this.squawk.match(PlaneFilter.callsign))
-    ) {
-        return true;
     }
 
     // filter out ground vehicles
@@ -1018,6 +1006,8 @@ PlaneObject.prototype.updateIcon = function() {
 
 PlaneObject.prototype.processTrace = function() {
 
+    const old_last_info_server = this.last_info_server;
+
     if (this.fullTrace && !this.fullTrace.trace) {
         this.fullTrace = null;
     }
@@ -1043,8 +1033,7 @@ PlaneObject.prototype.processTrace = function() {
     let pointsRecent = 0;
 
     if (!traceOpts.showTime) {
-        this.track_linesegs = [];
-        this.removeTrail();
+        this.resetTrail();
     }
 
     let firstPos = null;
@@ -1089,18 +1078,29 @@ PlaneObject.prototype.processTrace = function() {
         if (legEnd != null)
             end = legEnd;
 
-        if (traceOpts.startStamp != null || traceOpts.endStamp != null) {
+        if (traceOpts.startStamp != null) {
+            let found = 0;
             for (let i = start; i < end; i++) {
                 const timestamp = trace[i][0];
-
-                if (traceOpts.startStamp != null && timestamp < traceOpts.startStamp) {
-                    start = i + 1;
-                }
-                if (traceOpts.endStamp != null && timestamp > traceOpts.endStamp) {
-                    end = i;
+                if (timestamp >= traceOpts.startStamp) {
+                    start = i;
+                    found = 1
                     break;
                 }
             }
+            if (!found) { start = end = 0; }
+        }
+        if (traceOpts.endStamp != null) {
+            let found = 0;
+            for (let i = end - 1; i >= start; i--) {
+                const timestamp = trace[i][0];
+                if (timestamp <= traceOpts.endStamp) {
+                    end = i + 1;
+                    found = 1
+                    break;
+                }
+            }
+            if (!found) { start = end = 0; }
         }
 
         if (lastLeg && !showTrace) {
@@ -1242,7 +1242,7 @@ PlaneObject.prototype.processTrace = function() {
     }
 
 
-    //if ((this.position == null || tempPlane.position != null) && tempPlane.position_time > this.position_time && !showTrace && !replay) {
+    //if ((this.position == null || tempPlane.position != null) && tempPlane.position_time > this.position_time && !showTrace && !replay) {}
     //console.log(tempPlane.position_time + ' ' + this.position_time);
     if (tempPlane.last_message_time > this.last_message_time && !showTrace && !replay) {
         planeCloneState(this, tempPlane);
@@ -1313,17 +1313,24 @@ PlaneObject.prototype.processTrace = function() {
         updateAddressBar();
     }
 
+    this.updateTick();
+
     if (debugTracks) {
         console.log('3h: ' + pointsRecent.toString().padStart(4, ' ') + ' total: ' + points_in_trace);
+    }
+
+    if (old_last_info_server > this.last_info_server || !this.last_info_server) {
+        this.last_info_server = old_last_info_server;
     }
 };
 
 PlaneObject.prototype.updatePositionData = function(now, last, data, init) {
     if (this.position && SitePosition) {
-        if (pTracks && this.sitedist)
+        if (pTracks && this.sitedist) {
             this.sitedist = Math.max(ol.sphere.getDistance(SitePosition, this.position), this.sitedist);
-        else
+        } else {
             this.sitedist = ol.sphere.getDistance(SitePosition, this.position);
+        }
     }
 
     if (!globeIndex || this.selected || SelectedAllPlanes || replay) {
@@ -1461,15 +1468,7 @@ PlaneObject.prototype.updateData = function(now, last, data, init) {
         this.request_rotation_from_track = true;
     }
 
-    if (flight == null || flight == "@@@@@@@@") {
-        if (!replay) {
-            this.flight = null;
-            this.name ='no callsign';
-        }
-    } else {
-        this.flight = `${flight}`;
-        this.name = this.flight.trim() || 'empty callsign';
-    }
+    this.setFlight(flight);
 
     if (mlat && noMLAT) {
         this.dataSource = "modeS";
@@ -1517,6 +1516,10 @@ PlaneObject.prototype.updateData = function(now, last, data, init) {
         this.messageRateOld = messageRate;
     }
     this.messages = data.messages;
+
+    if (data.messageRate != null) {
+        this.messageRate = data.messageRate;
+    }
 
     if (data.rssi != null && data.rssi > -49.4) {
         if (!globeIndex && this.rssi != null && RefreshInterval < 1500) {
@@ -1631,6 +1634,9 @@ PlaneObject.prototype.updateData = function(now, last, data, init) {
     if (!this.dbinfoLoaded) {
         this.checkForDB(data);
     }
+
+    this.setTypeFlagsReg(data);
+
     this.last = now;
     this.updatePositionData(now, last, data, init);
     return;
@@ -2070,6 +2076,11 @@ PlaneObject.prototype.updateLines = function() {
 
 };
 
+PlaneObject.prototype.resetTrail = function() {
+    this.removeTrail();
+    this.track_linesegs = [];
+
+}
 PlaneObject.prototype.removeTrail = function() {
 
     if (this.trail_features)
@@ -2482,13 +2493,7 @@ PlaneObject.prototype.updateTraceData = function(state, _now) {
         this.rId = rId;
 
     if (data != null) {
-        if (data.flight == null || data.flight == "@@@@@@@@") {
-            this.flight = null;
-            this.name ='no callsign';
-        } else {
-            this.flight = `${data.flight}`;
-            this.name = this.flight.trim() || 'empty callsign';
-        }
+        this.setFlight(data.flight);
 
         if (data.alt_geom != null && !alt_geom && altitude != null && altitude != "ground") {
             //this.alt_geom = altitude + this.geom_diff;
@@ -2541,7 +2546,9 @@ PlaneObject.prototype.updateTraceData = function(state, _now) {
             this.nav_altitude = null;
         }
     }
-    if (this.addrtype.substring(0,4) == "adsb") {
+    if (!this.addrtype) {
+        this.dataSource = "unknown";
+    } else if (this.addrtype.substring(0,4) == "adsb") {
         this.dataSource = "adsb";
     } else if (this.addrtype.substring(0,4) == "adsr") {
         this.dataSource = "adsr";
@@ -2697,11 +2704,10 @@ PlaneObject.prototype.isNonIcao = function() {
 };
 
 PlaneObject.prototype.checkVisible = function() {
-    const jaeroTime = (this.dataSource == "adsc") ? jaeroTimeout : 0;
-    const noInfoTimeout = replay ? 600 : (reApi ? (30 + 2 * refreshInt() / 1000) : (30 + Math.min(1, (globeTilesViewCount / globeSimLoad)) * (2 * refreshInt() / 1000)));
-    const mlatTime = (this.dataSource == "mlat") ? 25 : 0;
+    const refresh = lastRefreshInt / 1000;
+    const noInfoTimeout = replay ? 600 : (reApi ? (30 + 2 * refresh) : (30 + Math.min(1, (globeTilesViewCount / globeSimLoad)) * (2 * refresh)));
     const modeSTime = (guessModeS && this.dataSource == "modeS") ? 300 : 0;
-    const tisbReduction = (this.icao[0] == '~') ? 15 : 0;
+    const tisbReduction = (adsbexchange && this.icao[0] == '~') ? 15 : 0;
     // If no packet in over 58 seconds, clear the plane.
     // Only clear the plane if it's not selected individually
 
@@ -2712,19 +2718,27 @@ PlaneObject.prototype.checkVisible = function() {
     }
     this.seen = Math.max(0, __now - this.last_message_time);
     this.seen_pos = Math.max(0, __now - this.position_time);
+    this.noInfoTime = __now - this.last_info_server;
 
+    let timeout = seenTimeout;
+    if (this.dataSource == "mlat") { timeout = seenTimeoutMlat; }
+    else if (this.dataSource == "adsc") { timeout = jaeroTimeout; }
 
-    return (!globeIndex || this.inView || this.selected || SelectedAllPlanes) && (
-        (!globeIndex && this.seen < (58 - tisbReduction + jaeroTime + refreshInt() / 1000))
-        || (globeIndex && this.seen_pos < (40 + jaeroTime + mlatTime + modeSTime - tisbReduction + refreshInt()) && now - this.last_info_server < noInfoTimeout)
+    timeout += modeSTime - tisbReduction + refresh;
+
+    const res = (!globeIndex || icaoFilter || this.inView || this.selected || SelectedAllPlanes) && (
+        (!globeIndex && this.seen < timeout)
+        || (globeIndex && this.seen_pos < timeout && this.noInfoTime < noInfoTimeout)
         || this.selected
         || noVanish
-        || (nogpsOnly && this.nogps && this.seen < 15 * 60)
+        || (nogpsOnly && this.nogps && this.seen < 15 * 60) // ugly hard coded
     );
+
+    return res;
 };
 
 PlaneObject.prototype.setTypeData = function() {
-	if (_aircraft_type_cache == null || !this.icaoType || this.icaoType == this.icaoTypeCache)
+	if (g.type_cache == null || !this.icaoType || this.icaoType == this.icaoTypeCache)
         return;
     this.updateMarker();
     this.icaoTypeCache = this.icaoType;
@@ -2733,10 +2747,10 @@ PlaneObject.prototype.setTypeData = function() {
     if (typeCode == 'P8 ?') {
         typeCode = 'P8';
     }
-    if (!(typeCode in _aircraft_type_cache))
+    if (!(typeCode in g.type_cache))
         return;
 
-    let typeData = _aircraft_type_cache[typeCode];
+    let typeData = g.type_cache[typeCode];
     const typeLong = typeData[0];
     const desc = typeData[1];
     const wtc = typeData[2];
@@ -2748,34 +2762,36 @@ PlaneObject.prototype.setTypeData = function() {
         this.typeLong = `${typeLong}`;
 };
 
-PlaneObject.prototype.checkForDB = function(t) {
+PlaneObject.prototype.setTypeFlagsReg = function(data) {
+        if (data.t && data.t != this.icaoType) {
+            this.icaoType = `${data.t}`;
+            this.setTypeData();
+        }
+        if (data.dbFlags) {
+            this.military = data.dbFlags & 1;
+            this.interesting = data.dbFlags & 2;
+            this.pia = data.dbFlags & 4;
+            this.ladd = data.dbFlags & 8;
+            if (this.pia)
+                this.registration = null;
+        }
+        if (data.r) this.registration = `${data.r}`;
+}
+
+PlaneObject.prototype.checkForDB = function(data) {
     if (!this.dbinfoLoaded && this.icao >= 'ae6620' && this.icao <= 'ae6899') {
         this.icaoType = 'P8 ?';
         this.setTypeData();
     }
-    if (t) {
+    if (data) {
 
-        if (t.desc) this.typeLong = `${t.desc}`;
+        if (data.desc) this.typeLong = `${data.desc}`;
+        if (data.ownOp) this.ownOp = `${data.ownOp}`;
+        if (data.year) this.year = `${data.year}`;
 
-        if (t.ownOp) this.ownOp = `${t.ownOp}`;
-        if (t.year) this.year = `${t.year}`;
+        this.setTypeFlagsReg(data);
 
-        if (t.t) {
-            this.icaoType = `${t.t}`;
-            this.setTypeData();
-        }
-        if (t.dbFlags) {
-            this.military = t.dbFlags & 1;
-            this.interesting = t.dbFlags & 2;
-            this.pia = t.dbFlags & 4;
-            this.ladd = t.dbFlags & 8;
-            if (this.pia)
-                this.registration = null;
-        }
-
-        if (t.r) this.registration = `${t.r}`;
-
-        if (t.r || t.t) {
+        if (data.r || data.t) {
             this.dbinfoLoaded = true;
         }
     }
@@ -2843,6 +2859,23 @@ PlaneObject.prototype.setProjection = function(arg) {
         this.olPoint.setCoordinates(proj);
     }
 }
+
+PlaneObject.prototype.setFlight = function(flight) {
+    if (flight == null) {
+        if (now - this.flightTs > 10 * 60) {
+            this.flight = null;
+            this.name ='no callsign';
+        }
+    } else if (flight == "@@@@@@@@") {
+        this.flight = null;
+        this.name ='no callsign';
+    } else {
+        this.flight = `${flight}`;
+        this.name = this.flight.trim() || 'empty callsign';
+        this.flightTs = now;
+    }
+}
+
 function normalizeTraceStamps(data) {
     if (!data || !data.trace) {
         console.log('normalizeTraceStamps: trace empty?')

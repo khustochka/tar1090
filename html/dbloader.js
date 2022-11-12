@@ -21,14 +21,12 @@
 
 "use strict";
 
-let _aircraft_cache = {};
-let _airport_coords_cache = null;
+let db = {};
 
-let _request_count = 0;
-let _request_queue = [];
-let _request_cache = {};
+db.request_count = 0;
+db.request_queue = [];
+db.request_cache = {};
 
-let regCache = null;
 
 Promise.unwrapped = () => {
   let resolve, reject, promise = new Promise((_resolve, _reject) => {
@@ -84,26 +82,11 @@ function request_from_db(icao, level, defer) {
         });
 }
 
-function getIcaoAircraftTypeData(aircraftData, defer) {
-	if (_aircraft_type_cache === null) {
-		jQuery.getJSON(databaseFolder + "/icao_aircraft_types.js")
-			.done(function(typeLookupData) {
-				_aircraft_type_cache = typeLookupData;
-			})
-			.always(function() {
-				lookupIcaoAircraftType(aircraftData, defer);
-			});
-	}
-	else {
-		lookupIcaoAircraftType(aircraftData, defer);
-	}
-}
-
 function lookupIcaoAircraftType(aircraftData, defer) {
-	if (_aircraft_type_cache !== null && aircraftData[1]) {
+	if (g.type_cache !== null && aircraftData[1]) {
 		let typeCode = aircraftData[1].toUpperCase();
-		if (typeCode in _aircraft_type_cache) {
-			let typeData = _aircraft_type_cache[typeCode];
+		if (typeCode in g.type_cache) {
+			let typeData = g.type_cache[typeCode];
             const typeLong = typeData[0];
             const desc = typeData[1];
             const wtc = typeData[2];
@@ -119,14 +102,14 @@ function lookupIcaoAircraftType(aircraftData, defer) {
 function db_ajax(bkey) {
 	let req;
 
-	if (bkey in _request_cache) {
-		return _request_cache[bkey];
+	if (bkey in db.request_cache) {
+		return db.request_cache[bkey];
 	}
 
-	req = _request_cache[bkey] = Promise.unwrapped();
+	req = db.request_cache[bkey] = Promise.unwrapped();
 	req.bkey = bkey;
 	// put it in the queue
-	_request_queue.push(req);
+	db.request_queue.push(req);
 
     db_ajax_request_complete();
 
@@ -137,11 +120,11 @@ function db_ajax_request_complete() {
 	let req;
 	let ajaxreq;
 
-	if (_request_queue.length == 0 || _request_count >= 1) {
+	if (db.request_queue.length == 0 || db.request_count >= 1) {
 		return;
 	} else {
-		_request_count++;
-		req = _request_queue.shift();
+		db.request_count++;
+		req = db.request_queue.shift();
 		const req_url = databaseFolder + '/' + req.bkey + '.js';
 		ajaxreq = jQuery.ajax({ url: req_url,
 			cache: true,
@@ -152,7 +135,7 @@ function db_ajax_request_complete() {
         });
 		ajaxreq.fail((jqxhr, status, error) => {
 			if (status == 'timeout') {
-				delete _request_cache[req.bkey];
+				delete db.request_cache[req.bkey];
 			}
 			jqxhr.url = req_url;
             let reason = new Error('');
@@ -166,7 +149,7 @@ function db_ajax_request_complete() {
 			req.reject(reason);
 		});
 		ajaxreq.always(function() {
-			_request_count--;
+			db.request_count--;
 			db_ajax_request_complete();
 		});
 	}
