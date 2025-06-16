@@ -1,7 +1,11 @@
 #!/bin/bash
 
 set -e
-trap 'echo ERROR on line number $LINENO' ERR
+trap 'echo "[ERROR] Error in line $LINENO when executing: $BASH_COMMAND"' ERR
+trap 'echo tar1090.sh: exiting; trap - SIGTERM; pkill -P $$ || true; exit 0' SIGTERM SIGINT SIGHUP SIGQUIT
+
+# run with lowest priority
+renice 20 $$ || true
 
 RUN_DIR=$1
 SRC_DIR=$2
@@ -63,7 +67,7 @@ fi
 
 newChunk() {
     if [[ "$1" != "refresh" ]]; then
-        curChunk="chunk_$(date +%s%N | head -c-7).gz"
+        curChunk="chunk_$(date +%s%3N).gz"
         echo "$curChunk" >> chunk_list
         echo "$curChunk" >> chunk_list_all
         cp "$1" "$curChunk"
@@ -145,7 +149,7 @@ while true; do
     cd "$RUN_DIR"
     if ! [[ -f chunks.json ]]; then
         echo "$RUN_DIR/chunks.json was corrupted or removed, fatal!"
-        exit 1
+        kill $$
     fi
     sleep $INTERVAL &
 
@@ -153,11 +157,14 @@ while true; do
         echo "{ \"files\" : [ ] }" | gzip -1 > empty.gz
     fi
 
-    date=$(date +%s%N | head -c-7)
+    date=$(date +%s%3N)
 
     next_error=0
     error_printed=0
     while ! [[ -f "$SRC_DIR/aircraft.json" ]] || ! prune "$SRC_DIR/aircraft.json" "history_$date.json"; do
+        if ! [[ -f chunks.json ]]; then
+            break
+        fi
         now=$(date +%s%N | head -c-7)
         if (( now > next_error )); then
             if (( next_error != 0 )); then
@@ -166,7 +173,7 @@ while true; do
             fi
             next_error=$(( now + 10000 ))
         fi
-        sleep 2
+        sleep 2 & wait $!
     done
     if (( error_printed != 0 )); then
         echo "Found aircraft.json in $SRC_DIR, continuing operation as per usual!"
@@ -227,12 +234,12 @@ if [[ $ENABLE_978 == "yes" ]]; then
     done &
 fi
 
-sleep 10
 
 if [[ -n "$PF_URL" ]] && [[ "x$PF_ENABLE" != "x0" ]]; then
+    sleep 10 & wait $!
     while true
     do
-        sleep 10 &
+        sleep 10 & wait $!
         TMP="$RUN_DIR/tar1090-tmp.pf.json"
         if cd "$RUN_DIR" && wget -T 5 -O "$TMP" "$PF_URL" &>/dev/null; then
             sed -i -e 's/"user_l[a-z]*":"[0-9,.,-]*",//g' "$TMP"
@@ -242,10 +249,10 @@ if [[ -n "$PF_URL" ]] && [[ "x$PF_ENABLE" != "x0" ]]; then
             fi
         else
             rm -f "$TMP"
-            sleep 120
+            sleep 120 & wait $!
         fi
         wait
     done &
 fi
 
-wait -n
+wait || true

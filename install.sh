@@ -1,34 +1,45 @@
 #!/bin/bash
+# shellcheck shell=bash disable=SC2016
+umask 022
+
 
 set -e
 trap 'echo "[ERROR] Error in line $LINENO when executing: $BASH_COMMAND"' ERR
 renice 10 $$
 
-if [ -d /bup ]; then
-    echo Talk to @PIL. Dieses Skript ist nichts fuer dich!
-    exit 1
-fi
-
-
 srcdir=/run/dump1090-fa
 repo="https://github.com/khustochka/tar1090"
 branch="ui"
 db_repo="https://github.com/wiedehopf/tar1090-db"
+
+# optional command line options for this install script
+# $1: data source directory
+# $2: web path, default is "tar1090", use "webroot" to place the install at /
+# $3: specify install path
+# $4: specify git path as source instead of pulling from git
+
 ipath=/usr/local/share/tar1090
+if [[ -n "$3" ]]; then ipath="$3"; fi
+
+if [[ -n "$4" ]] && grep -qs -e 'tar1090' "$4/install.sh"; then git_source="$4"; fi
+
 lighttpd=no
 nginx=no
+function useSystemd () { command -v systemctl &>/dev/null; }
 
-mkdir -p $ipath
-mkdir -p $ipath/aircraft_sil
+gpath="$TAR1090_UPDATE_DIR"
+if [[ -z "$gpath" ]]; then gpath="$ipath"; fi
 
+mkdir -p "$ipath"
+mkdir -p "$gpath"
 
-if ! id -u tar1090 &>/dev/null
+if useSystemd && ! id -u tar1090 &>/dev/null
 then
-    adduser --system --home $ipath --no-create-home --quiet tar1090 || adduser --system --home-dir $ipath --no-create-home tar1090
+    adduser --system --home "$ipath" --no-create-home --quiet tar1090 || adduser --system --home-dir "$ipath" --no-create-home tar1090
 fi
 
 # terminate with /
-command_package="git git/jq jq/wget wget"
+command_package="git git/jq jq/curl curl"
 packages=()
 
 while read -r -d '/' CMD PKG
@@ -81,9 +92,15 @@ fi
 
 dir=$(pwd)
 
-if (( $( { du -s "$ipath/git-db" 2>/dev/null || echo 0; } | cut -f1) > 150000 )); then
-    rm -rf "$ipath/git-db"
+if (( $( { du -s "$gpath/git-db" 2>/dev/null || echo 0; } | cut -f1) > 150000 )); then
+    rm -rf "$gpath/git-db"
 fi
+
+function copyNoClobber() {
+    if ! [[ -f "$2" ]]; then
+        cp "$1" "$2"
+    fi
+}
 
 function getGIT() {
     # getGIT $REPO $BRANCH $TARGET (directory)
@@ -102,11 +119,14 @@ function revision() {
     git rev-parse --short HEAD 2>/dev/null || echo "$RANDOM-$RANDOM"
 }
 
-if ! { [[ "$1" == "test" ]] && cd "$ipath/git-db"; }; then
-    getGIT "$db_repo" "master" "$ipath/git-db" || true
+if ! { [[ "$1" == "test" ]] && cd "$gpath/git-db"; }; then
+    DB_VERSION_NEW=$(curl --silent --show-error "https://raw.githubusercontent.com/wiedehopf/tar1090-db/master/version")
+    if  [[ "$(cat "$gpath/git-db/version" 2>/dev/null)" != "$DB_VERSION_NEW" ]]; then
+        getGIT "$db_repo" "master" "$gpath/git-db" || true
+    fi
 fi
 
-if ! cd $ipath/git-db
+if ! cd "$gpath/git-db"
 then
     echo "Unable to download files, exiting! (Maybe try again?)"
     exit 1
@@ -116,20 +136,29 @@ DB_VERSION=$(revision)
 
 cd "$dir"
 
-if [[ "$1" == "test" ]]
-then
-    rm -r /tmp/tar1090-test 2>/dev/null || true
-    mkdir -p /tmp/tar1090-test
-    cp -r ./* /tmp/tar1090-test
-    cd /tmp/tar1090-test
-    TAR_VERSION=$(date +%s)
+if [[ "$1" == "test" ]] || [[ -n "$git_source" ]]; then
+    mkdir -p "$gpath/git"
+    rm -rf "$gpath/git"/* || true
+    if [[ -n "$git_source" ]]; then
+        cp -r "$git_source"/* "$gpath/git"
+    else
+        cp -r ./* "$gpath/git"
+    fi
+    cd "$gpath/git"
+    TAR_VERSION="$(cat version)_dirty"
 else
-    if ! getGIT "$repo" "$branch" "$ipath/git" || ! cd "$ipath/git"
-    then
+    VERSION_NEW=$(curl --silent --show-error "https://raw.githubusercontent.com/wiedehopf/tar1090/master/version")
+    if  [[ "$(cat "$gpath/git/version" 2>/dev/null)" != "$VERSION_NEW" ]]; then
+        if ! getGIT "$repo" "$branch" "$gpath/git"; then
+            echo "Unable to download files, exiting! (Maybe try again?)"
+            exit 1
+        fi
+    fi
+    if ! cd "$gpath/git"; then
         echo "Unable to download files, exiting! (Maybe try again?)"
         exit 1
     fi
-    TAR_VERSION="$(revision)"
+    TAR_VERSION="$(cat version)"
 fi
 
 
@@ -149,6 +178,8 @@ elif [[ -f /run/dump1090-mutability/aircraft.json ]]; then
     srcdir=/run/dump1090-mutability
 elif [[ -f /run/skyaware978/aircraft.json ]]; then
     srcdir=/run/skyaware978
+elif [[ -f /run/shm/aircraft.json ]]; then
+    srcdir=/run/shm
 else
     echo --------------
     echo FATAL: could not find aircraft.json in any of the usual places!
@@ -163,7 +194,7 @@ fi
 if [[ -n $2 ]]; then
     instances="$srcdir $2"
 elif [[ -n $1 ]] && [ "$1" != "test" ] ; then
-    instances="$srcdir tar1090"
+    instances="$1 tar1090"
 elif [ -f /etc/default/tar1090_instances ]; then
     instances=$(</etc/default/tar1090_instances)
 else
@@ -177,7 +208,7 @@ fi
 instances=$(echo -e "$instances" | grep -v -e '^#')
 
 
-if ! diff tar1090.sh /usr/local/share/tar1090/tar1090.sh &>/dev/null; then
+if ! diff tar1090.sh "$ipath"/tar1090.sh &>/dev/null; then
     changed=yes
     while read -r srcdir instance; do
         if [[ -z "$srcdir" || -z "$instance" ]]; then
@@ -189,16 +220,20 @@ if ! diff tar1090.sh /usr/local/share/tar1090/tar1090.sh &>/dev/null; then
         else
             service="tar1090"
         fi
-        systemctl stop $service 2>/dev/null || true
+        if useSystemd; then
+            systemctl stop "$service" 2>/dev/null || true
+        fi
     done < <(echo "$instances")
-    cp tar1090.sh $ipath
+    rm -f "$ipath"/tar1090.sh
+    cp tar1090.sh "$ipath"
 fi
 
 
 # copy over base files
-cp install.sh uninstall.sh getupintheair.sh LICENSE README.md $ipath
-cp default $ipath/example_config_dont_edit
-rm -f $ipath/default
+cp install.sh uninstall.sh getupintheair.sh LICENSE README.md "$ipath"
+cp default "$ipath/example_config_dont_edit"
+cp html/config.js "$ipath/example_config.js"
+rm -f "$ipath/default"
 
 # create 95-tar1090-otherport.conf
 {
@@ -208,7 +243,7 @@ rm -f $ipath/default
     echo '}'
 } > 95-tar1090-otherport.conf
 
-services=""
+services=()
 names=""
 otherport=""
 
@@ -229,26 +264,25 @@ do
         html_path="$ipath/html"
         service="tar1090"
     fi
-    services+="$service "
+    services+=("$service")
     names+="$instance "
 
     # don't overwrite existing configuration
-    cp -n default /etc/default/$service
-    sed -i -e 's/skyview978/skyaware978/' /etc/default/$service
+    useSystemd && copyNoClobber default /etc/default/"$service"
 
-    sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?$service?g" \
+    sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?${service}?g" \
         -e "s?/INSTANCE??g" -e "s?HTMLPATH?$html_path?g" 95-tar1090-otherport.conf
 
     if [[ "$instance" == "webroot" ]]; then
-        sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?$service?g" \
+        sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?${service}?g" \
             -e "s?/INSTANCE??g" -e "s?HTMLPATH?$html_path?g" 88-tar1090.conf
-        sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?$service?g" \
+        sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?${service}?g" \
             -e "s?/INSTANCE/?/?g" -e "s?HTMLPATH?$html_path?g" nginx.conf
         sed -i -e "s?/INSTANCE?/?g" nginx.conf
     else
-        sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?$service?g" \
+        sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?${service}?g" \
             -e "s?INSTANCE?$instance?g" -e "s?HTMLPATH?$html_path?g" 88-tar1090.conf
-        sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?$service?g" \
+        sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?${service}?g" \
             -e "s?INSTANCE?$instance?g" -e "s?HTMLPATH?$html_path?g" nginx.conf
     fi
 
@@ -262,10 +296,10 @@ do
     fi
 
 
-    sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?$service?g" tar1090.service
+    sed -i.orig -e "s?SOURCE_DIR?$srcdir?g" -e "s?SERVICE?${service}?g" tar1090.service
 
     cp -r -T html "$TMP"
-    cp -r -T "$ipath/git-db/db" "$TMP/db-$DB_VERSION"
+    cp -r -T "$gpath/git-db/db" "$TMP/db-$DB_VERSION"
     sed -i -e "s/let databaseFolder = .*;/let databaseFolder = \"db-$DB_VERSION\";/" "$TMP/index.html"
     echo "{ \"tar1090Version\": \"$TAR_VERSION\", \"databaseVersion\": \"$DB_VERSION\" }" > "$TMP/version.json"
 
@@ -295,57 +329,16 @@ do
     dir=$(pwd)
     cd "$TMP"
 
-    sed -i -e "s/tar1090 on github/tar1090 on github ($(date +%y%m%d))/" index.html
+    sed -i -e "s/tar1090 on github/tar1090 on github (${TAR_VERSION})/" index.html
 
-    sed -i \
-        -e "s/dbloader.js/dbloader_$TAR_VERSION.js/" \
-        -e "s/defaults.js/defaults_$TAR_VERSION.js/" \
-        -e "s/early.js/early_$TAR_VERSION.js/" \
-        -e "s/flags.js/flags_$TAR_VERSION.js/" \
-        -e "s/formatter.js/formatter_$TAR_VERSION.js/" \
-        -e "s/layers.js/layers_$TAR_VERSION.js/" \
-        -e "s/markers.js/markers_$TAR_VERSION.js/" \
-        -e "s/planeObject.js/planeObject_$TAR_VERSION.js/" \
-        -e "s/registrations.js/registrations_$TAR_VERSION.js/" \
-        -e "s/script.js/script_$TAR_VERSION.js/" \
-        -e "s/style.css/style_$TAR_VERSION.css/" \
-        index.html
-
-    mv dbloader.js "dbloader_$TAR_VERSION.js"
-    mv defaults.js "defaults_$TAR_VERSION.js"
-    mv early.js "early_$TAR_VERSION.js"
-    mv flags.js "flags_$TAR_VERSION.js"
-    mv formatter.js "formatter_$TAR_VERSION.js"
-    mv layers.js "layers_$TAR_VERSION.js"
-    mv markers.js "markers_$TAR_VERSION.js"
-    mv planeObject.js "planeObject_$TAR_VERSION.js"
-    mv registrations.js "registrations_$TAR_VERSION.js"
-    mv script.js "script_$TAR_VERSION.js"
-    mv style.css "style_$TAR_VERSION.css"
-
-    if [[ $nginx == yes ]]; then
-        gzip -k -9 "dbloader_$TAR_VERSION.js"
-        gzip -k -9 "defaults_$TAR_VERSION.js"
-        gzip -k -9 "early_$TAR_VERSION.js"
-        gzip -k -9 "flags_$TAR_VERSION.js"
-        gzip -k -9 "formatter_$TAR_VERSION.js"
-        gzip -k -9 "layers_$TAR_VERSION.js"
-        gzip -k -9 "markers_$TAR_VERSION.js"
-        gzip -k -9 "planeObject_$TAR_VERSION.js"
-        gzip -k -9 "registrations_$TAR_VERSION.js"
-        gzip -k -9 "script_$TAR_VERSION.js"
-        gzip -k -9 "style_$TAR_VERSION.css"
-
-        gzip -k -9 ./libs/*.js
-        #gzip -k -9 db2/*.json .... already exists compressed
-    fi
+    "$gpath/git/cachebust.sh" "$gpath/git/cachebust.list" "$TMP"
 
     rm -rf "$html_path"
     mv "$TMP" "$html_path"
 
     cd "$dir"
 
-    cp nginx.conf "$ipath/nginx-$service.conf"
+    cp nginx.conf "$ipath/nginx-${service}.conf"
 
     if [[ $lighttpd == yes ]]; then
         # clean up broken symlinks in conf-enabled ...
@@ -362,26 +355,28 @@ do
             true
         elif [[ "$instance" == "webroot" ]]
         then
-            cp 88-tar1090.conf /etc/lighttpd/conf-available/99-$service.conf
-            ln -f -s /etc/lighttpd/conf-available/99-$service.conf /etc/lighttpd/conf-enabled/99-$service.conf
+            cp 88-tar1090.conf /etc/lighttpd/conf-available/99-"${service}".conf
+            ln -f -s /etc/lighttpd/conf-available/99-"${service}".conf /etc/lighttpd/conf-enabled/99-"${service}".conf
         else
-            cp 88-tar1090.conf /etc/lighttpd/conf-available/88-$service.conf
-            ln -f -s /etc/lighttpd/conf-available/88-$service.conf /etc/lighttpd/conf-enabled/88-$service.conf
+            cp 88-tar1090.conf /etc/lighttpd/conf-available/88-"${service}".conf
+            ln -f -s /etc/lighttpd/conf-available/88-"${service}".conf /etc/lighttpd/conf-enabled/88-"${service}".conf
             if [ -f /etc/lighttpd/conf.d/69-skybup.conf ]; then
-                mv /etc/lighttpd/conf-enabled/88-$service.conf /etc/lighttpd/conf-enabled/66-$service.conf
+                mv /etc/lighttpd/conf-enabled/88-"${service}".conf /etc/lighttpd/conf-enabled/66-"${service}".conf
             fi
         fi
     fi
 
-    if [[ $changed == yes ]] || ! diff tar1090.service /lib/systemd/system/$service.service &>/dev/null
-    then
-        cp tar1090.service /lib/systemd/system/$service.service
-        if systemctl enable $service
+    if useSystemd; then
+        if [[ $changed == yes ]] || ! diff tar1090.service /lib/systemd/system/"${service}".service &>/dev/null
         then
-            echo "Restarting $service ..."
-            systemctl restart $service || ! pgrep systemd
-        else
-            echo "$service.service is masked, could not start it!"
+            cp tar1090.service /lib/systemd/system/"${service}".service
+            if systemctl enable "${service}"
+            then
+                echo "Restarting ${service} ..."
+                systemctl restart "$service" || ! pgrep systemd
+            else
+                echo "${service}.service is masked, could not start it!"
+            fi
         fi
     fi
 
@@ -391,7 +386,6 @@ do
     mv nginx.conf.orig nginx.conf
     mv tar1090.service.orig tar1090.service
 done < <(echo "$instances")
-
 
 if [[ $lighttpd == yes ]]; then
     if lighttpd -tt -f /etc/lighttpd/lighttpd.conf 2>&1 | grep -i duplicate >/dev/null; then
@@ -462,7 +456,7 @@ if [[ $lighttpd == yes ]]; then
     fi
 fi
 
-if systemctl show lighttpd 2>/dev/null | grep -qs -F -e 'UnitFileState=enabled' -e 'ActiveState=active'; then
+if useSystemd && systemctl show lighttpd 2>/dev/null | grep -qs -F -e 'UnitFileState=enabled' -e 'ActiveState=active'; then
     echo "Restarting lighttpd ..."
     systemctl restart lighttpd || ! pgrep systemd
 fi
@@ -474,8 +468,8 @@ if [[ $nginx == yes ]]; then
     echo
     echo "To configure nginx for tar1090, please add the following line(s) in the server {} section:"
     echo
-    for service in $services; do
-        echo "include /usr/local/share/tar1090/nginx-$service.conf;"
+    for service in "${services[@]}"; do
+        echo "include ${ipath}/nginx-${service}.conf;"
     done
 fi
 
@@ -490,6 +484,6 @@ elif [[ $nginx == yes ]]; then
         echo "All done! Webinterface once nginx is configured will be available at http://$(ip route get 1.2.3.4 | grep -m1 -o -P 'src \K[0-9,.]*')/$name"
     done
 else
-    echo "All done! You'll need to configure your webserver yourself, see /usr/local/share/tar1090/nginx-tar1090.conf for a reference nginx configuration"
+    echo "All done! You'll need to configure your webserver yourself, see ${ipath}/nginx-tar1090.conf for a reference nginx configuration"
 fi
 
