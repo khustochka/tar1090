@@ -1753,6 +1753,11 @@ jQuery('#selected_altitude_geom1')
         showHideButtons();
         runAfterLoad(showHideButtons);
     }
+
+
+    if (pTracks) $(".pTracksLink").hide();
+    else $(".noTracksLink").hide();
+
 }
 
 function initLegend(colors) {

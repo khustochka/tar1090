@@ -13,7 +13,7 @@ let disabled = false;
 
 // -- Title Settings --------------------------------------
 // Show number of aircraft and/or messages per second in the page title
-let PlaneCountInTitle = false;
+let PlaneCountInTitle = true;
 let MessageRateInTitle = false;
 
 // -- Output Settings -------------------------------------
@@ -64,7 +64,7 @@ let defaultOverlays = [];
 let dwdLayers = 'dwd:RADOLAN-RY';
 
 // Default map dim state
-let MapDim = true;
+let MapDim = false;
 let mapDimPercentage = 0.45;
 let mapContrastPercentage = 0;
 
@@ -203,7 +203,7 @@ let ColorByAlt = {
 // Also called range rings :)
 let SiteCircles = true; // true to show circles (only shown if the center marker is shown)
 // In miles, nautical miles, or km (depending settings value 'DisplayUnits')
-let SiteCirclesDistances = new Array(100, 150, 200);
+let SiteCirclesDistances = new Array(50, 100, 150, 200);
 // When more circles defined than cirle colors last color will be used or black by default
 let SiteCirclesColors = ['#000000', '#000000', '#000000'];
 // Show circles using dashed line (CAUTION, can be slow, especially when zooming in a lot)
@@ -268,8 +268,8 @@ let filterTISB = false;
 let imageConfigLink = "";
 let imageConfigText = "";
 
-let flightawareLinks = false;
-let shareBaseUrl = false;
+let flightawareLinks = true;
+let shareBaseUrl = 'https://globe.adsbexchange.com/';
 let planespottersLinks = false;
 
 // show links to various registration websites (not all countries)
@@ -313,7 +313,7 @@ let HideCols = [
 //	"#sitedist",
 	"#track",
 	"#msgs",
-	"#seen",
+//	"#seen",
 //	"#rssi",
 	"#lat",
 	"#lon",
@@ -376,7 +376,7 @@ let jaeroTimeout = 35 * 60; // in seconds
 let seenTimeout = 58; // in seconds
 let seenTimeoutMlat = 58; // in seconds
 
-let darkModeDefault = true; // turn on dark mode by default (change in browser possible)
+let darkModeDefault = false; // turn on dark mode by default (change in browser possible)
 
 let tableInView = false; // only show aircraft in current view (V button)
 
